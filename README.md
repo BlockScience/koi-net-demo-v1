@@ -22,6 +22,8 @@ KOI-net consists of the following components:
 
 ### Option 1: Local Development Setup
 
+#### Option A: Using Make
+
 ```bash
 # Clone repositories and generate configurations
 make setup-all
@@ -46,7 +48,46 @@ make hackmd-processor-cli
 
 # Run the GitHub processor node CLI tool to inspect the GitHub events (run in a separate terminal)
 make github-processor-cli
+```
 
+#### Option B: Using the command-line tool
+
+The `cli.py` script provides a more direct way to run commands without using Make.
+
+```bash
+# Make the script executable
+chmod +x koi-nets-demo-v2/koin
+
+# Clone repositories and generate configurations
+python cli.py setup-all
+
+# Run the coordinator node (run in a separate terminal)
+python cli.py coordinator
+
+# Run the GitHub sensor node (run in a separate terminal)
+python cli.py github-sensor
+
+# Run the HackMD sensor node (run in a separate terminal)
+python cli.py hackmd-sensor
+
+# Run the GitHub processor node (run in a separate terminal)
+python cli.py github-processor
+
+# Run the HackMD processor node (run in a separate terminal)
+python cli.py hackmd-processor
+
+# Run the HackMD processor CLI (shorter version of hackmd-processor-cli)
+python cli.py hackmd-cli
+# Or with a specific command:
+python cli.py hackmd-cli stats
+
+# Run the GitHub processor CLI (shorter version of github-processor-cli)
+python cli.py github-cli
+# Or with a specific command:
+python cli.py github-cli show-events BlockScience/koi-net
+
+# Show available commands
+python cli.py --help
 ```
 
 ### Option 2: Docker Setup (Recommended)
@@ -85,7 +126,6 @@ GITHUB_WEBHOOK_SECRET=your_webhook_secret_here
 # HackMD API Token
 HACKMD_API_TOKEN=your_hackmd_token_here
 ```
-
 These tokens are required for the sensors to access GitHub repositories and HackMD notes.
 
 Alternatively, you can perform each step manually:
@@ -297,7 +337,33 @@ Each node runs as an independent service, connecting to the coordinator for netw
 
 ### Alternative to Make
 
-If you prefer not to use Make, you can run the commands directly:
+#### Option 1: Using the koin Command Line Tool
+
+The project includes a convenient command line tool (`koin`) that provides all the functionality of the Makefile:
+
+```bash
+# Make the script executable (only needs to be done once)
+chmod +x koi-nets-demo-v2/koin
+
+# Generate Docker configurations
+python cli.py docker-setup
+
+# Start all services
+python cli.py docker-up
+
+# Check status
+python cli.py docker-status
+
+# Show all CLI tools available
+python cli.py --help
+
+# Stop all services
+python cli.py docker-down
+```
+
+#### Option 2: Direct Docker Commands
+
+You can also run the Docker commands directly:
 
 ```bash
 # Generate configs with Docker support

@@ -374,6 +374,9 @@ def copy_docker_compose_template():
 
     Note: These port assignments are the same in both Docker and local modes and
     match the SERVICE_PORTS configuration.
+    
+    Returns:
+        bool: True if environment variables are properly set up, False otherwise
     """
     templates_dir = Path(__file__).parent / "templates"
     docker_compose_template = templates_dir / "docker-compose.template.yml"
@@ -399,15 +402,19 @@ def copy_docker_compose_template():
     global_env = Path(__file__).parent / "global.env"
     global_env_example = Path(__file__).parent / "global.env.example"
 
-    if not global_env.exists():
-        # First check if we have an example file to copy from
-        if global_env_example.exists():
-            shutil.copy2(global_env_example, global_env)
-            console.print(f"[bold green]Copied global.env.example to {global_env}[/bold green]")
-        else:
-            # Create a new file with helpful comments if no example exists
-            with open(global_env, "w") as f:
-                f.write("""# Global environment variables for all KOI-net containers
+    try:
+        # Ensure the directory for global.env exists
+        global_env.parent.mkdir(parents=True, exist_ok=True)
+
+        if not global_env.exists():
+            # First check if we have an example file to copy from
+            if global_env_example.exists():
+                shutil.copy2(global_env_example, global_env)
+                console.print(f"[bold green]Copied global.env.example to {global_env}[/bold green]")
+            else:
+                # Create a new file with helpful comments if no example exists
+                with open(global_env, "w") as f:
+                    f.write("""# Global environment variables for all KOI-net containers
 # This file is used by all Docker containers via the 'env_file' setting in docker-compose.yml
 # You MUST edit this file to add your actual API tokens before running the containers
 
@@ -423,11 +430,36 @@ GITHUB_WEBHOOK_SECRET=
 # HackMD API token for accessing note data
 # Get this from your HackMD account settings
 HACKMD_API_TOKEN=
-""")
-            console.print(f"[bold green]Created sample environment file: {global_env}[/bold green]")
-    else:
-        console.print(f"[bold green]Using existing environment file: {global_env}[/bold green]")
-        console.print(f"[bold yellow]Make sure it contains valid API tokens for GitHub and HackMD[/bold yellow]")
+    """)
+                console.print(f"[bold green]Created sample environment file: {global_env}[/bold green]")
+        else:
+            console.print(f"[bold green]Using existing environment file: {global_env}[/bold green]")
+
+    except Exception as e:
+        console.print(f"[bold red]Error creating global.env file: {e}[/bold red]")
+        return False
+        # Validate that environment variables are set
+        with open(global_env, 'r') as env_file:
+            env_content = env_file.read()
+            missing_vars = []
+            
+            # Check for empty variables
+            if "GITHUB_TOKEN=" in env_content or "GITHUB_TOKEN=\n" in env_content:
+                missing_vars.append("GITHUB_TOKEN")
+            if "GITHUB_WEBHOOK_SECRET=" in env_content or "GITHUB_WEBHOOK_SECRET=\n" in env_content:
+                missing_vars.append("GITHUB_WEBHOOK_SECRET")
+            if "HACKMD_API_TOKEN=" in env_content or "HACKMD_API_TOKEN=\n" in env_content:
+                missing_vars.append("HACKMD_API_TOKEN")
+            
+            if missing_vars:
+                console.print(f"[bold red]WARNING: The following required environment variables are not set in {global_env}:[/bold red]")
+                for var in missing_vars:
+                    console.print(f"[bold red]  - {var}[/bold red]")
+                console.print(f"[bold yellow]Please edit {global_env} to add your API tokens before running the containers[/bold yellow]")
+                return False
+            else:
+                console.print(f"[bold green]All required environment variables are set in {global_env}[/bold green]")
+        
         console.print("[bold green]docker-compose template created![/bold green]")
 
     # Create a modified copy of the docker-compose template with the correct ports
@@ -447,6 +479,8 @@ HACKMD_API_TOKEN=
 
     console.print(f"[bold green]Copied docker-compose.yml to {docker_compose_dest} with ports from SERVICE_PORTS[/bold green]")
     console.print(f"[bold green]Volume mounts in docker-compose.yml are configured based on cache_directory_path in node configs[/bold green]")
+    
+    return True
 
 def main(is_docker=False):
     """
@@ -510,7 +544,10 @@ GITHUB_WEBHOOK_SECRET=
         console.print(f"[bold green]Using Dockerfile template: {dockerfile_template}[/bold green]")
 
         # Generate docker-compose.yml with ports from SERVICE_PORTS
-        copy_docker_compose_template()
+        env_vars_valid = copy_docker_compose_template()
+        if not env_vars_valid:
+            console.print("[bold yellow]Environment variables are not properly set up. Docker services may not work correctly.[/bold yellow]")
+            console.print("[bold yellow]Continue with setup but remember to update global.env before running 'docker-compose up'[/bold yellow]")
 
     # Set the coordinator URL based on whether we're in docker mode
     coordinator_port = SERVICE_PORTS["koi-net-coordinator-node"]
@@ -601,7 +638,22 @@ GITHUB_WEBHOOK_SECRET=
         console.print("[bold green]- Configuration URLs set for Docker networking[/bold green]")
         console.print("[bold green]- docker-compose.yml has been copied to project root[/bold green]")
         console.print("[bold green]- Ports assigned: 8080 (coordinator), 8001 (GitHub), 8002 (HackMD), 8011/8012 (processors)[/bold green]")
-        console.print("[bold green]- You can now run 'docker-compose up' to start the containers[/bold green]\n")
+        
+        # Check if any global.env file exists and has been validated
+        global_env = Path(__file__).parent / "global.env"
+        if global_env.exists():
+            with open(global_env, 'r') as env_file:
+                env_content = env_file.read()
+                if "GITHUB_TOKEN=" in env_content or "HACKMD_API_TOKEN=" in env_content or "GITHUB_WEBHOOK_SECRET=" in env_content:
+                    console.print("[bold red]⚠️  WARNING: One or more environment variables in global.env are not set![/bold red]")
+                    console.print("[bold red]The system will not work correctly without proper API tokens.[/bold red]")
+                    console.print("[bold yellow]- You can now run 'docker-compose up' to start the containers, but you MUST edit global.env first[/bold yellow]\n")
+                else:
+                    console.print("[bold green]- You can now run 'docker-compose up' to start the containers[/bold green]\n")
+        else:
+            console.print("[bold red]⚠️  WARNING: global.env file is missing! The system will not work correctly.[/bold red]")
+            console.print("[bold yellow]- Create a global.env file with your API tokens before running docker-compose[/bold yellow]\n")
+        
         console.print("[bold yellow]Important Docker run instructions:[/bold yellow]")
         console.print("[bold yellow]1. Edit global.env in the project root to set your API tokens[/bold yellow]")
         console.print("[bold yellow]2. Run 'docker-compose build' to build the containers[/bold yellow]")

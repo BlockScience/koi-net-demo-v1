@@ -4,7 +4,7 @@
         run-all demo-orchestrator demo-coordinator demo-github-sensor demo-hackmd-sensor \
         demo-github-processor demo-hackmd-processor demo-cli docker-clean docker-rebuild up down docker-demo \
         docker-regenerate show-ports wait-for-service demo-github-cli demo-hackmd-cli demo-show-services \
-        docker-status docker-logs docker-monitor cli-help clean-docker-containers kill-ports rename-directories
+        docker-status docker-logs docker-monitor cli-help clean-docker-containers kill-ports check-env
 
 # Define VENV_DIR and PYTHON_EXECUTABLE_FOR_VENV_CREATION if not already suitably defined
 # Ensure these are defined before their first use in targets.
@@ -42,7 +42,6 @@ $(VENV_DIR)/.installed_root_requirements: $(VENV_DIR)/.pip_ready requirements.tx
 
 setup-all:
 	@echo "Setting up all node repositories..."
-	@$(MAKE) rename-directories
 	python orchestrator.py
 
 clean:
@@ -50,7 +49,6 @@ clean:
 	@$(MAKE) clean-cache
 	@$(MAKE) clean-venv
 	@$(MAKE) clean-build
-	@$(MAKE) rename-directories
 	@echo "Clean complete."
 
 # Cleaning targets
@@ -129,13 +127,14 @@ demo-orchestrator:
 	python orchestrator.py --docker
 	@echo "Docker configurations generated. You can now run 'make up' to start all services."
 	@echo "IMPORTANT: Make sure to add your API tokens to global.env before starting services!"
+	@$(MAKE) check-env || true
 	@$(MAKE) show-ports
 
 # Docker commands
 demo-coordinator:
 	@echo "Starting Coordinator via Docker Compose..."
 	docker compose build coordinator
-	docker compose up coordinator
+	docker compose up -d coordinator
 	@echo "Coordinator started on port 8080"
 
 demo-github-sensor:
@@ -176,18 +175,16 @@ docker-rebuild:
 	@echo "Rebuilding Docker images with no cache..."
 	docker compose build --no-cache
 	@echo "Starting Docker services..."
+	@$(MAKE) check-env || true
 	docker compose up -d
-	@echo "Services started with the following ports:"
-	@echo "- Coordinator: 8080"
-	@echo "- GitHub Sensor: 8001"
-	@echo "- HackMD Sensor: 8002"
-	@echo "- GitHub Processor: 8011"
-	@echo "- HackMD Processor: 8012"
+	@echo "Services started with the standard ports:"
+	@$(MAKE) show-ports
 
 up:
 	@echo "Starting Docker services..."
+	@$(MAKE) check-env || true
 	docker compose up
-	@echo "Services running on ports defined in orchestrator.py DOCKER_PORTS"
+	@echo "Services running on ports defined in orchestrator.py SERVICE_PORTS"
 
 down:
 	@echo "Stopping Docker services..."
@@ -202,9 +199,9 @@ clean-docker-containers:
 # Target to show service status after startup
 demo-show-services:
 	@echo "=== GitHub Repository Status ==="
-	@cd koi-net-github-processor-node && .venv/bin/python -m cli list-repos || echo "GitHub processor not initialized yet"
+	@cd koi-net-github-processor-node 2>/dev/null && .venv/bin/python -m cli list-repos 2>/dev/null || echo "GitHub processor not initialized yet"
 	@echo "\n=== HackMD Notes Status ==="
-	@cd koi-net-hackmd-processor-node && .venv/bin/python -m cli list || echo "HackMD processor not initialized yet"
+	@cd koi-net-hackmd-processor-node 2>/dev/null && .venv/bin/python -m cli list 2>/dev/null || echo "HackMD processor not initialized yet"
 
 # Individual demo CLI commands for each node type
 
@@ -272,24 +269,6 @@ kill-ports:
 	-@lsof -ti:8012 | xargs kill -9 2>/dev/null || echo "No process on port 8012"
 	@echo "All processes on KOI-net ports have been terminated."
 
-# Target to rename directories from old to new format
-rename-directories:
-	@echo "Renaming directories to match consistent naming pattern..."
-	@if [ -d "koi-net-processor-gh-node" ] && [ -d "koi-net-github-processor-node" ]; then \
-		echo "Both directories exist. Moving files from koi-net-processor-gh-node to koi-net-github-processor-node..."; \
-		rsync -av --ignore-existing koi-net-processor-gh-node/ koi-net-github-processor-node/; \
-		echo "Removing koi-net-processor-gh-node directory..."; \
-		rm -rf koi-net-processor-gh-node; \
-	elif [ -d "koi-net-processor-gh-node" ]; then \
-		echo "Renaming koi-net-processor-gh-node to koi-net-github-processor-node..."; \
-		mv koi-net-processor-gh-node koi-net-github-processor-node; \
-	fi
-	@echo "Checking for spaces in directory names..."
-	@if [ -d "koi-net-hackmd-processor -node" ]; then \
-		echo "Renaming directory with space to koi-net-hackmd-processor-node..."; \
-		mv "koi-net-hackmd-processor -node" koi-net-hackmd-processor-node; \
-	fi
-	@echo "Directory renaming complete."
 
 # Wait with timeout for a service to be healthy
 wait-for-service:
@@ -333,13 +312,45 @@ show-ports:
 	@echo "- HackMD Processor: 8012"
 	@grep -A 5 "SERVICE_PORTS = {" orchestrator.py || echo "Could not find port definitions in orchestrator.py"
 
-docker-demo: kill-ports clean-cache clean-docker-containers rename-directories
+check-env:
+	@if [ -f global.env ]; then \
+		missing_vars=""; \
+		if ! grep -q "GITHUB_TOKEN=.*[^[:space:]]" global.env; then \
+			missing_vars="$$missing_vars GITHUB_TOKEN"; \
+		fi; \
+		if ! grep -q "GITHUB_WEBHOOK_SECRET=.*[^[:space:]]" global.env; then \
+			missing_vars="$$missing_vars GITHUB_WEBHOOK_SECRET"; \
+		fi; \
+		if ! grep -q "HACKMD_API_TOKEN=.*[^[:space:]]" global.env; then \
+			missing_vars="$$missing_vars HACKMD_API_TOKEN"; \
+		fi; \
+		if [ -n "$$missing_vars" ]; then \
+			echo "⚠️  [ERROR] The following environment variables are not set in global.env:"; \
+			echo "$$missing_vars"; \
+			echo ""; \
+			echo "Please edit global.env to set your API tokens before continuing."; \
+			echo "You can use your favorite text editor:"; \
+			echo "    nano global.env"; \
+			echo ""; \
+			exit 1; \
+		else \
+			echo "✅ Environment variables validated successfully."; \
+		fi; \
+	else \
+		echo "⚠️  [ERROR] global.env file not found!"; \
+		echo "Please run 'make demo-orchestrator' first to generate it."; \
+		exit 1; \
+	fi
+
+docker-demo: kill-ports clean-cache clean-docker-containers
 	@echo "========== STARTING KOI-NET DOCKER WORKFLOW =========="
 	@echo "Step 1: Generate Docker configurations..."
 	@$(MAKE) demo-orchestrator
 	@echo "Step 2: Building all services..."
 	docker compose build
-	@echo "Step 3: Starting all services..."
+	@echo "Step 3: Validating environment variables..."
+	@$(MAKE) check-env || true
+	@echo "Step 4: Starting all services..."
 	docker compose up -d
 	@echo "All services are now running with the following ports:"
 	@$(MAKE) show-ports
@@ -352,13 +363,13 @@ docker-demo: kill-ports clean-cache clean-docker-containers rename-directories
 	@echo "\n========== ALL SERVICES ARE HEALTHY =========="
 	@echo "\n========== SYSTEM STATUS REPORTS =========="
 	@echo "\n=== GitHub Repository Status ==="
-	-@docker compose exec github-processor python -m cli list-repos
+	-@docker compose exec github-processor python -m cli list-repos 2>/dev/null || echo "GitHub processor not initialized yet"
 	@echo "\n=== GitHub Events Summary ==="
-	-@docker compose exec github-processor python -m cli summary
+	-@docker compose exec github-processor python -m cli summary 2>/dev/null || echo "GitHub processor not initialized yet"
 	@echo "\n=== HackMD Notes Status ==="
-	-@docker compose exec hackmd-processor python -m cli list
+	-@docker compose exec hackmd-processor python -m cli list 2>/dev/null || echo "HackMD processor not initialized yet"
 	@echo "\n=== HackMD Notes Statistics ==="
-	-@docker compose exec hackmd-processor python -m cli stats
+	-@docker compose exec hackmd-processor python -m cli stats 2>/dev/null || echo "HackMD processor not initialized yet"
 	@echo "\n========== KOI-NET SYSTEM READY =========="
 	@echo "Use 'make down' to stop all services when done."
 	@echo "Use 'make demo-github-cli' or 'make demo-hackmd-cli' to run more CLI commands."
