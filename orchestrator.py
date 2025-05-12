@@ -581,7 +581,7 @@ GITHUB_WEBHOOK_SECRET=
             str(config_path),
             first_contact or "-"
         )
-        port += 1
+
     console.print(f"\nAll repos cloned, config.yaml written, and requirements installed with standard pip/venv.\n")
     console.print(table)
 
