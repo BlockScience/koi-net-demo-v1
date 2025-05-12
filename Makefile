@@ -4,7 +4,7 @@
         run-all demo-orchestrator demo-coordinator demo-github-sensor demo-hackmd-sensor \
         demo-github-processor demo-hackmd-processor demo-cli docker-clean docker-rebuild up down docker-demo \
         docker-regenerate show-ports wait-for-service demo-github-cli demo-hackmd-cli demo-show-services \
-        docker-status docker-logs docker-monitor cli-help
+        docker-status docker-logs docker-monitor cli-help clean-docker-containers kill-ports
 
 # Define VENV_DIR and PYTHON_EXECUTABLE_FOR_VENV_CREATION if not already suitably defined
 # Ensure these are defined before their first use in targets.
@@ -80,7 +80,7 @@ clean-cache:
 
 # Orchestration target
 orchestrator: install
-	. $(VENV_DIR)/bin/activate && python orchestrator.py
+	python orchestrator.py
 
 # Individual node runners
 coordinator:
@@ -190,6 +190,12 @@ down:
 	@echo "Stopping Docker services..."
 	docker compose down
 
+clean-docker-containers:
+	@echo "Stopping and removing Docker containers related to KOI-net..."
+	-docker compose down 2>/dev/null || true
+	-docker rm -f $$(docker ps -a --filter "name=koi-nets-demo-v1" -q) 2>/dev/null || true
+	@echo "Docker containers cleaned."
+
 # Target to show service status after startup
 demo-show-services:
 	@echo "=== GitHub Repository Status ==="
@@ -253,20 +259,34 @@ cli-help:
 	@echo "Show note statistics:             docker compose exec processor-hackmd python -m cli stats"
 	@echo "\n(To get help on the CLI itself, append '--help' to any command)"
 
+# Kill processes using KOI-net ports
+kill-ports:
+	@echo "Killing processes using KOI-net ports..."
+	-@lsof -ti:8080 | xargs kill -9 2>/dev/null || echo "No process on port 8080"
+	-@lsof -ti:8001 | xargs kill -9 2>/dev/null || echo "No process on port 8001"
+	-@lsof -ti:8002 | xargs kill -9 2>/dev/null || echo "No process on port 8002"
+	-@lsof -ti:8011 | xargs kill -9 2>/dev/null || echo "No process on port 8011"
+	-@lsof -ti:8012 | xargs kill -9 2>/dev/null || echo "No process on port 8012"
+	@echo "All processes on KOI-net ports have been terminated."
+
 # Wait with timeout for a service to be healthy
 wait-for-service:
 	@timeout=180; \
 	echo "Waiting for $(SERVICE) (timeout: $${timeout}s)..."; \
 	start_time=$$(date +%s); \
-	until docker compose ps --services --filter "health=healthy" | grep $(SERVICE) > /dev/null; do \
+	container_name="koi-nets-demo-v1-$(SERVICE)-1"; \
+	until docker ps --filter "name=$$container_name" --format "{{.Status}}" | grep -q "healthy"; do \
+		status=$$(docker ps --filter "name=$$container_name" --format "{{.Status}}" || echo "Unknown"); \
 		current_time=$$(date +%s); \
 		elapsed_time=$$((current_time - start_time)); \
 		if [ $$elapsed_time -ge $$timeout ]; then \
 			echo "Timeout waiting for $(SERVICE) after $${timeout}s"; \
+			echo "Current status: $$status"; \
+			docker logs $$container_name --tail 20; \
 			exit 1; \
 		fi; \
 		sleep 5; \
-		echo "Still waiting for $(SERVICE) ($${elapsed_time}s elapsed)..."; \
+		echo "Still waiting for $(SERVICE) ($${elapsed_time}s elapsed)... Current status: $$status"; \
 	done; \
 	echo "$(SERVICE) is healthy after $$(($$(date +%s) - start_time))s!"
 
@@ -291,7 +311,7 @@ show-ports:
 	@echo "- HackMD Processor: 8012"
 	@grep -A 5 "DOCKER_PORTS = {" orchestrator.py || echo "Could not find port definitions in orchestrator.py"
 
-docker-demo: clean-cache
+docker-demo: kill-ports clean-cache clean-docker-containers
 	@echo "========== STARTING KOI-NET DOCKER WORKFLOW =========="
 	@echo "Step 1: Generate Docker configurations..."
 	@$(MAKE) demo-orchestrator

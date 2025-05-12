@@ -22,13 +22,7 @@ services:
         networks:
             - koinet
         healthcheck:
-            test:
-                [
-                    "CMD",
-                    "curl",
-                    "--fail",
-                    "http://localhost:8080/koi-net/health",
-                ]
+            test: ["CMD", "curl", "--fail", "http://localhost:8080/koi-net/health"]
             interval: 30s
             timeout: 5s
             retries: 3
@@ -60,13 +54,7 @@ services:
         networks:
             - koinet
         healthcheck:
-            test:
-                [
-                    "CMD",
-                    "curl",
-                    "--fail",
-                    "http://localhost:8001/koi-net/health",
-                ]
+            test: ["CMD", "curl", "--fail", "http://localhost:8001/koi-net/health"]
             interval: 30s
             timeout: 5s
             retries: 3
@@ -98,13 +86,7 @@ services:
         networks:
             - koinet
         healthcheck:
-            test:
-                [
-                    "CMD",
-                    "curl",
-                    "--fail",
-                    "http://localhost:8002/koi-net/health",
-                ]
+            test: ["CMD", "curl", "--fail", "http://localhost:8002/koi-net/health"]
             interval: 30s
             timeout: 5s
             retries: 3
@@ -139,13 +121,7 @@ services:
         networks:
             - koinet
         healthcheck:
-            test:
-                [
-                    "CMD",
-                    "curl",
-                    "--fail",
-                    "http://localhost:8011/koi-net/health",
-                ]
+            test: ["CMD", "curl", "--fail", "http://localhost:8011/koi-net/health"]
             interval: 30s
             timeout: 5s
             retries: 3
@@ -180,13 +156,7 @@ services:
         networks:
             - koinet
         healthcheck:
-            test:
-                [
-                    "CMD",
-                    "curl",
-                    "--fail",
-                    "http://localhost:8012/koi-net/health",
-                ]
+            test: ["CMD", "curl", "--fail", "http://localhost:8012/koi-net/health"]
             interval: 30s
             timeout: 5s
             retries: 3

@@ -14,8 +14,9 @@ KOI-net consists of the following components:
 ## Prerequisites
 
 - Python 3.12+
-- Docker and Docker Compose (for Docker mode)
+- Docker and Docker Compose v2+ (for Docker mode)
 - Git
+- Make (or see alternatives in the Implementation Details section)
 
 ## Setup Options
 
@@ -255,6 +256,9 @@ make clean-cache
 
 # Clean only virtual environments
 make clean-venv
+
+# Kill processes using KOI-net ports (8080, 8001, 8002, 8011, 8012)
+make kill-ports
 ```
 
 ## Troubleshooting
@@ -270,6 +274,9 @@ If CLI commands return with "No repositories found" or "No notes found":
 - **Authentication errors**: Check your API tokens in `global.env`. The GitHub token needs `repo` and `read:org` scopes.
 - **Missing repositories**: Use `docker compose exec processor-github python -m cli add-repo owner/repo` to manually add repositories.
 - **No HackMD notes**: Ensure your HackMD API token has access to the team workspace.
+- **Health check failures**: Some services may fail health checks initially. Check logs with `docker logs koi-nets-demo-v1-coordinator-1` or use `make docker-logs` to troubleshoot.
+- **"Unknown filter health" error**: If you see this error, your Docker Compose version might not support filtering by health status. Update Docker Compose or use `docker ps` to check container health status directly.
+- **Port already in use**: If you see errors about ports being in use, run `make kill-ports` to terminate processes using the KOI-net ports.
 
 ## Implementation Details
 
@@ -281,12 +288,30 @@ The system is orchestrated through three main components:
 
 Each node runs as an independent service, connecting to the coordinator for network discovery.
 
+### Alternative to Make
+
+If you prefer not to use Make, you can run the commands directly:
+
+```bash
+# Generate configs with Docker support
+python orchestrator.py --docker
+
+# Build and start services
+docker compose up -d
+
+# Check status
+docker ps
+
+# Stop services
+docker compose down
+```
+
 ## Docker Technical Details
 
 - Uses Python 3.12 slim image as base
 - Installs dependencies from requirements.txt using standard pip (not editable mode)
 - Configures each service with appropriate networking setup
-- Uses healthchecks to ensure services are properly initialized
+- Uses healthchecks with path `/koi-net/health` to ensure services are properly initialized
 - Preserves `global.env` file between runs to maintain API tokens
 - Regenerates all other configuration files automatically
 - Smart fallback to standard package installation if requirements.txt is not found
