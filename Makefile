@@ -1,10 +1,10 @@
 # Define all phony targets (targets that don't represent files)
 .PHONY: clean clean-build clean-venv clean-cache setup install setup-all orchestrate \
-        coordinator github-sensor hackmd-sensor processor-gh processor-hackmd \
+        coordinator github-sensor hackmd-sensor github-processor hackmd-processor \
         run-all demo-orchestrator demo-coordinator demo-github-sensor demo-hackmd-sensor \
         demo-github-processor demo-hackmd-processor demo-cli docker-clean docker-rebuild up down docker-demo \
         docker-regenerate show-ports wait-for-service demo-github-cli demo-hackmd-cli demo-show-services \
-        docker-status docker-logs docker-monitor cli-help clean-docker-containers kill-ports
+        docker-status docker-logs docker-monitor cli-help clean-docker-containers kill-ports rename-directories
 
 # Define VENV_DIR and PYTHON_EXECUTABLE_FOR_VENV_CREATION if not already suitably defined
 # Ensure these are defined before their first use in targets.
@@ -42,6 +42,7 @@ $(VENV_DIR)/.installed_root_requirements: $(VENV_DIR)/.pip_ready requirements.tx
 
 setup-all:
 	@echo "Setting up all node repositories..."
+	@$(MAKE) rename-directories
 	python orchestrator.py
 
 clean:
@@ -49,6 +50,7 @@ clean:
 	@$(MAKE) clean-cache
 	@$(MAKE) clean-venv
 	@$(MAKE) clean-build
+	@$(MAKE) rename-directories
 	@echo "Clean complete."
 
 # Cleaning targets
@@ -96,30 +98,31 @@ hackmd-sensor:
 	rm -rf koi-net-hackmd-sensor-node/node.sensor.log
 	cd koi-net-hackmd-sensor-node && .venv/bin/python -m hackmd_sensor_node
 
-processor-gh:
+github-processor:
 	@echo "Running GitHub Processor Node..."
-	cd koi-net-processor-gh-node && .venv/bin/python -m processor_github_node
+	cd koi-net-github-processor-node && .venv/bin/python -m github_processor_node
 
-processor-hackmd:
+hackmd-processor:
 	@echo "Running HackMD Processor Node..."
 	rm -rf koi-net-hackmd-processor-node/node.proc.log
 	cd koi-net-hackmd-processor-node && .venv/bin/python -m hackmd_processor_node
 
-processor-hackmd-cli:
+hackmd-processor-cli:
 	@echo "Running HackMD Processor Node CLI..."
 	cd koi-net-hackmd-processor-node && .venv/bin/python -m cli list
 
-processor-gh-cli:
+github-processor-cli:
 	@echo "Running GitHub Processor Node CLI..."
-	cd koi-net-processor-gh-node && .venv/bin/python -m cli list-repos
+	cd koi-net-github-processor-node && .venv/bin/python -m cli list-repos
 # Run all nodes in separate terminals
 run-all:
 	@echo "You must run each node in a separate terminal:"
 	@echo "Terminal 1: make coordinator"
 	@echo "Terminal 2: make github-sensor"
 	@echo "Terminal 3: make hackmd-sensor"
-	@echo "Terminal 4: make processor-gh"
-	@echo "Terminal 5: make processor-hackmd"
+	@echo "Terminal 4: make github-processor"
+	@echo "Terminal 5: make hackmd-processor"
+	@echo "\nOr use Docker mode: make docker-demo"
 
 demo-orchestrator:
 	@echo "Starting Orchestrator via Docker Compose..."
@@ -199,7 +202,7 @@ clean-docker-containers:
 # Target to show service status after startup
 demo-show-services:
 	@echo "=== GitHub Repository Status ==="
-	@cd koi-net-processor-gh-node && .venv/bin/python -m cli list-repos || echo "GitHub processor not initialized yet"
+	@cd koi-net-github-processor-node && .venv/bin/python -m cli list-repos || echo "GitHub processor not initialized yet"
 	@echo "\n=== HackMD Notes Status ==="
 	@cd koi-net-hackmd-processor-node && .venv/bin/python -m cli list || echo "HackMD processor not initialized yet"
 
@@ -208,29 +211,29 @@ demo-show-services:
 # Docker CLI demonstration targets
 demo-github-cli:
 	@echo "Running GitHub CLI in Docker..."
-	docker compose exec processor-github python -m cli list-repos
+	docker compose exec github-processor python -m cli list-repos
 	@echo "\nFor more commands try:"
-	@echo "docker compose exec processor-github python -m cli summary"
-	@echo "docker compose exec processor-github python -m cli show-events BlockScience/koi-net"
-	@echo "docker compose exec processor-github python -m cli event-details <event_rid>"
-	@echo "docker compose exec processor-github python -m cli add-repo BlockScience/koios"
+	@echo "docker compose exec github-processor python -m cli summary"
+	@echo "docker compose exec github-processor python -m cli show-events BlockScience/koi-net"
+	@echo "docker compose exec github-processor python -m cli event-details <event_rid>"
+	@echo "docker compose exec github-processor python -m cli add-repo BlockScience/koios"
 
 demo-hackmd-cli:
 	@echo "Running HackMD CLI in Docker..."
-	docker compose exec processor-hackmd python -m cli list
+	docker compose exec hackmd-processor python -m cli list
 	@echo "\nFor more commands try:"
-	@echo "docker compose exec processor-hackmd python -m cli stats"
-	@echo "docker compose exec processor-hackmd python -m cli search koi-net"
-	@echo "docker compose exec processor-hackmd python -m cli show C1xso4C8SH-ZzDaloTq4Uw"
-	@echo "docker compose exec processor-hackmd python -m cli history C1xso4C8SH-ZzDaloTq4Uw"
-	@echo "docker compose exec processor-hackmd python -m cli list --limit 10 --search koi"
+	@echo "docker compose exec hackmd-processor python -m cli stats"
+	@echo "docker compose exec hackmd-processor python -m cli search koi-net"
+	@echo "docker compose exec hackmd-processor python -m cli show C1xso4C8SH-ZzDaloTq4Uw"
+	@echo "docker compose exec hackmd-processor python -m cli history C1xso4C8SH-ZzDaloTq4Uw"
+	@echo "docker compose exec hackmd-processor python -m cli list --limit 10 --search koi"
 
 # Docker monitoring commands
 docker-status:
 	@echo "========== KOI-NET SERVICES STATUS =========="
 	@docker compose ps
 	@echo "\n========== HEALTH CHECKS =========="
-	@for svc in coordinator github-sensor hackmd-sensor processor-github processor-hackmd; do \
+	@for svc in coordinator github-sensor hackmd-sensor github-processor hackmd-processor ; do \
 		echo "$$svc: $$(docker compose ps --services --filter "health=healthy" | grep -q $$svc && echo "✅ HEALTHY" || echo "❌ UNHEALTHY")"; \
 	done
 
@@ -246,17 +249,17 @@ docker-monitor:
 cli-help:
 	@echo "========== KOI-NET CLI COMMANDS =========="
 	@echo "\n=== GitHub CLI Commands ==="
-	@echo "List all tracked repos:           docker compose exec processor-github python -m cli list-repos"
-	@echo "Show repository events:           docker compose exec processor-github python -m cli show-events BlockScience/koi-net [--limit 20]"
-	@echo "View event details:               docker compose exec processor-github python -m cli event-details <event_rid>"
-	@echo "Add a new repository:             docker compose exec processor-github python -m cli add-repo BlockScience/koios"
-	@echo "Show events summary:              docker compose exec processor-github python -m cli summary"
+	@echo "List all tracked repos:           docker compose exec github-processor python -m cli list-repos"
+	@echo "Show repository events:           docker compose exec github-processor python -m cli show-events BlockScience/koi-net [--limit 20]"
+	@echo "View event details:               docker compose exec github-processor python -m cli event-details <event_rid>"
+	@echo "Add a new repository:             docker compose exec github-processor python -m cli add-repo BlockScience/koios"
+	@echo "Show events summary:              docker compose exec github-processor python -m cli summary"
 	@echo "\n=== HackMD CLI Commands ==="
-	@echo "List all notes:                   docker compose exec processor-hackmd python -m cli list [--limit 20] [--offset 0] [--search query]"
-	@echo "Show note details:                docker compose exec processor-hackmd python -m cli show C1xso4C8SH-ZzDaloTq4Uw"
-	@echo "Show note history:                docker compose exec processor-hackmd python -m cli history C1xso4C8SH-ZzDaloTq4Uw [--limit 20]"
-	@echo "Search notes by content:          docker compose exec processor-hackmd python -m cli search 'koi-net' [--limit 20]"
-	@echo "Show note statistics:             docker compose exec processor-hackmd python -m cli stats"
+	@echo "List all notes:                   docker compose exec hackmd-processor python -m cli list [--limit 20] [--offset 0] [--search query]"
+	@echo "Show note details:                docker compose exec hackmd-processor python -m cli show C1xso4C8SH-ZzDaloTq4Uw"
+	@echo "Show note history:                docker compose exec hackmd-processor python -m cli history C1xso4C8SH-ZzDaloTq4Uw [--limit 20]"
+	@echo "Search notes by content:          docker compose exec hackmd-processor python -m cli search 'koi-net' [--limit 20]"
+	@echo "Show note statistics:             docker compose exec hackmd-processor python -m cli stats"
 	@echo "\n(To get help on the CLI itself, append '--help' to any command)"
 
 # Kill processes using KOI-net ports
@@ -268,6 +271,25 @@ kill-ports:
 	-@lsof -ti:8011 | xargs kill -9 2>/dev/null || echo "No process on port 8011"
 	-@lsof -ti:8012 | xargs kill -9 2>/dev/null || echo "No process on port 8012"
 	@echo "All processes on KOI-net ports have been terminated."
+
+# Target to rename directories from old to new format
+rename-directories:
+	@echo "Renaming directories to match consistent naming pattern..."
+	@if [ -d "koi-net-processor-gh-node" ] && [ -d "koi-net-github-processor-node" ]; then \
+		echo "Both directories exist. Moving files from koi-net-processor-gh-node to koi-net-github-processor-node..."; \
+		rsync -av --ignore-existing koi-net-processor-gh-node/ koi-net-github-processor-node/; \
+		echo "Removing koi-net-processor-gh-node directory..."; \
+		rm -rf koi-net-processor-gh-node; \
+	elif [ -d "koi-net-processor-gh-node" ]; then \
+		echo "Renaming koi-net-processor-gh-node to koi-net-github-processor-node..."; \
+		mv koi-net-processor-gh-node koi-net-github-processor-node; \
+	fi
+	@echo "Checking for spaces in directory names..."
+	@if [ -d "koi-net-hackmd-processor -node" ]; then \
+		echo "Renaming directory with space to koi-net-hackmd-processor-node..."; \
+		mv "koi-net-hackmd-processor -node" koi-net-hackmd-processor-node; \
+	fi
+	@echo "Directory renaming complete."
 
 # Wait with timeout for a service to be healthy
 wait-for-service:
@@ -303,15 +325,15 @@ docker-regenerate:
 	@echo "Docker regeneration complete. Use 'make up' to start services."
 
 show-ports:
-	@echo "Port mappings defined in orchestrator.py DOCKER_PORTS are:"
+	@echo "Port mappings for all modes (Docker and local):"
 	@echo "- Coordinator: 8080"
 	@echo "- GitHub Sensor: 8001"
 	@echo "- HackMD Sensor: 8002"
 	@echo "- GitHub Processor: 8011"
 	@echo "- HackMD Processor: 8012"
-	@grep -A 5 "DOCKER_PORTS = {" orchestrator.py || echo "Could not find port definitions in orchestrator.py"
+	@grep -A 5 "SERVICE_PORTS = {" orchestrator.py || echo "Could not find port definitions in orchestrator.py"
 
-docker-demo: kill-ports clean-cache clean-docker-containers
+docker-demo: kill-ports clean-cache clean-docker-containers rename-directories
 	@echo "========== STARTING KOI-NET DOCKER WORKFLOW =========="
 	@echo "Step 1: Generate Docker configurations..."
 	@$(MAKE) demo-orchestrator
@@ -325,18 +347,18 @@ docker-demo: kill-ports clean-cache clean-docker-containers
 	@$(MAKE) wait-for-service SERVICE=coordinator
 	@$(MAKE) wait-for-service SERVICE=github-sensor
 	@$(MAKE) wait-for-service SERVICE=hackmd-sensor
-	@$(MAKE) wait-for-service SERVICE=processor-github
-	@$(MAKE) wait-for-service SERVICE=processor-hackmd
+	@$(MAKE) wait-for-service SERVICE=github-processor
+	@$(MAKE) wait-for-service SERVICE=hackmd-processor
 	@echo "\n========== ALL SERVICES ARE HEALTHY =========="
 	@echo "\n========== SYSTEM STATUS REPORTS =========="
 	@echo "\n=== GitHub Repository Status ==="
-	-@docker compose exec processor-github python -m cli list-repos
+	-@docker compose exec github-processor python -m cli list-repos
 	@echo "\n=== GitHub Events Summary ==="
-	-@docker compose exec processor-github python -m cli summary
+	-@docker compose exec github-processor python -m cli summary
 	@echo "\n=== HackMD Notes Status ==="
-	-@docker compose exec processor-hackmd python -m cli list
+	-@docker compose exec hackmd-processor python -m cli list
 	@echo "\n=== HackMD Notes Statistics ==="
-	-@docker compose exec processor-hackmd python -m cli stats
+	-@docker compose exec hackmd-processor python -m cli stats
 	@echo "\n========== KOI-NET SYSTEM READY =========="
 	@echo "Use 'make down' to stop all services when done."
 	@echo "Use 'make demo-github-cli' or 'make demo-hackmd-cli' to run more CLI commands."

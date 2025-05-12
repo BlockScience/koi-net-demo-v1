@@ -200,7 +200,7 @@ python -m examples.basic_coordinator_node
 python -m examples.basic_partial_node
 ```
 
-The coordinator node will start a web server on port 8000, and the partial node will connect to it.
+The coordinator node will start a web server on port 8080, and the partial node will connect to it.
 
 ### Extending the Examples
 

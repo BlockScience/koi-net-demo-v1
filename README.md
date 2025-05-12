@@ -36,10 +36,17 @@ make github-sensor
 make hackmd-sensor
 
 # Run the GitHub processor node (run in a separate terminal)
-make processor-gh
+make github-processor
 
 # Run the HackMD processor node (run in a separate terminal)
-make processor-hackmd
+make hackmd-processor
+
+# Run the HackMD processor node CLI tool to inspect the HackMD events (run in a separate terminal)
+make hackmd-processor-cli
+
+# Run the GitHub processor node CLI tool to inspect the GitHub events (run in a separate terminal)
+make github-processor-cli
+
 ```
 
 ### Option 2: Docker Setup (Recommended)
@@ -96,7 +103,7 @@ make down
 
 ## Port Configuration
 
-The system uses the following port mapping:
+The system uses the following port mapping for both local and Docker modes:
 
 ```
 - Coordinator: 8080
@@ -123,27 +130,27 @@ make demo-github-cli
 ```
 or directly:
 ```bash
-docker compose exec processor-github python -m cli list-repos
+docker compose exec github-processor python -m cli list-repos
 ```
 
 #### View GitHub Event Summary
 ```bash
-docker compose exec processor-github python -m cli summary
+docker compose exec github-processor python -m cli summary
 ```
 
 #### Show Events for a Repository
 ```bash
-docker compose exec processor-github python -m cli show-events BlockScience/koi-net
+docker compose exec github-processor python -m cli show-events BlockScience/koi-net
 ```
 
 #### Add a New Repository to Track
 ```bash
-docker compose exec processor-github python -m cli add-repo BlockScience/koios
+docker compose exec github-processor python -m cli add-repo BlockScience/koios
 ```
 
 #### View Details for a Specific Event
 ```bash
-docker compose exec processor-github python -m cli event-details <event_rid>
+docker compose exec github-processor python -m cli event-details <event_rid>
 ```
 
 ### HackMD CLI Operations
@@ -154,32 +161,32 @@ make demo-hackmd-cli
 ```
 or directly:
 ```bash
-docker compose exec processor-hackmd python -m cli list
+docker compose exec hackmd-processor python -m cli list
 ```
 
 #### Display Note Statistics
 ```bash
-docker compose exec processor-hackmd python -m cli stats
+docker compose exec hackmd-processor python -m cli stats
 ```
 
 #### View a Specific Note
 ```bash
-docker compose exec processor-hackmd python -m cli show C1xso4C8SH-ZzDaloTq4Uw
+docker compose exec hackmd-processor python -m cli show C1xso4C8SH-ZzDaloTq4Uw
 ```
 
 #### Show Note History
 ```bash
-docker compose exec processor-hackmd python -m cli history C1xso4C8SH-ZzDaloTq4Uw
+docker compose exec hackmd-processor python -m cli history C1xso4C8SH-ZzDaloTq4Uw
 ```
 
 #### Search Notes by Content
 ```bash
-docker compose exec processor-hackmd python -m cli search "koi-net"
+docker compose exec hackmd-processor python -m cli search "koi-net"
 ```
 
 #### Filter Notes by Conditions
 ```bash
-docker compose exec processor-hackmd python -m cli list --limit 10 --search koi
+docker compose exec hackmd-processor python -m cli list --limit 10 --search koi
 ```
 
 ### CLI Help
@@ -191,8 +198,8 @@ make cli-help
 
 For detailed help on specific commands:
 ```bash
-docker compose exec processor-github python -m cli --help
-docker compose exec processor-github python -m cli show-events --help
+docker compose exec github-processor python -m cli --help
+docker compose exec github-processor python -m cli show-events --help
 ```
 
 ## System Management
@@ -272,7 +279,7 @@ If CLI commands return with "No repositories found" or "No notes found":
 ### Common Issues
 
 - **Authentication errors**: Check your API tokens in `global.env`. The GitHub token needs `repo` and `read:org` scopes.
-- **Missing repositories**: Use `docker compose exec processor-github python -m cli add-repo owner/repo` to manually add repositories.
+- **Missing repositories**: Use `docker compose exec github-processor python -m cli add-repo owner/repo` to manually add repositories.
 - **No HackMD notes**: Ensure your HackMD API token has access to the team workspace.
 - **Health check failures**: Some services may fail health checks initially. Check logs with `docker logs koi-nets-demo-v1-coordinator-1` or use `make docker-logs` to troubleshoot.
 - **"Unknown filter health" error**: If you see this error, your Docker Compose version might not support filtering by health status. Update Docker Compose or use `docker ps` to check container health status directly.
@@ -328,5 +335,5 @@ The system uses the following environment variables:
 
 ## Database Locations
 
-- GitHub event database: `/app/.koi/processor-github/index.db` in the processor-github container
-- HackMD note database: `/app/.koi/index_db/index.db` in the processor-hackmd container
+- GitHub event database: `/app/.koi/github-processor/index.db` in the github-processor container
+- HackMD note database: `/app/.koi/index_db/index.db` in the hackmd-processor container

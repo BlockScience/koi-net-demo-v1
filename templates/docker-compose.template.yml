@@ -22,7 +22,7 @@ services:
         networks:
             - koinet
         healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8080/koi-net/health"]
+            test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
             interval: 30s
             timeout: 5s
             retries: 3
@@ -54,7 +54,7 @@ services:
         networks:
             - koinet
         healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8001/koi-net/health"]
+            test: ["CMD", "curl", "--fail", "http://localhost:8001/health"]
             interval: 30s
             timeout: 5s
             retries: 3
@@ -86,15 +86,15 @@ services:
         networks:
             - koinet
         healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8002/koi-net/health"]
+            test: ["CMD", "curl", "--fail", "http://localhost:8002/health"]
             interval: 30s
             timeout: 5s
             retries: 3
             start_period: 15s
 
-    processor-github:
+    github-processor:
         build:
-            context: ./koi-net-processor-gh-node
+            context: ./koi-net-github-processor-node
             args:
                 - PORT=8011
                 - MODULE_NAME=processor_github_node
@@ -110,8 +110,8 @@ services:
         volumes:
             - ./config:/config:ro
             - cache_data:${RID_CACHE_DIR:-/data/cache}
-            - processor_github_state:/app/.koi/processor-github/cache
-            - index_db_data:/app/.koi/processor-github/index.db
+            - github_processor_state:/app/.koi/github-processor/cache
+            - github_index_db_data:/app/.koi/github-processor/index.db
         depends_on:
             coordinator:
                 condition: service_healthy
@@ -121,18 +121,18 @@ services:
         networks:
             - koinet
         healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8011/koi-net/health"]
+            test: ["CMD", "curl", "--fail", "http://localhost:8011/health"]
             interval: 30s
             timeout: 5s
             retries: 3
             start_period: 15s
 
-    processor-hackmd:
+    hackmd-processor:
         build:
             context: ./koi-net-hackmd-processor-node
             args:
                 - PORT=8012
-                - MODULE_NAME=processor_hackmd_node
+                - MODULE_NAME=hackmd_processor_node
         ports:
             - "8012:8012"
         env_file:
@@ -145,8 +145,8 @@ services:
         volumes:
             - ./config:/config:ro
             - cache_data:${RID_CACHE_DIR:-/data/cache}
-            - processor_hackmd_state:/app/.koi/processor-hackmd
-            - index_db_data:/app/.koi/index_db/index.db
+            - hackmd_processor_state:/app/.koi/hackmd-processor
+            - hackmd_index_db_data:/app/.koi/index_db/index.db
         depends_on:
             coordinator:
                 condition: service_healthy
@@ -156,7 +156,7 @@ services:
         networks:
             - koinet
         healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8012/koi-net/health"]
+            test: ["CMD", "curl", "--fail", "http://localhost:8012/health"]
             interval: 30s
             timeout: 5s
             retries: 3
@@ -171,11 +171,13 @@ volumes:
         driver: local
     hackmd_state_data:
         driver: local
-    processor_github_state:
+    github_processor_state:
         driver: local
-    processor_hackmd_state:
+    hackmd_processor_state:
         driver: local
-    index_db_data:
+    github_index_db_data:
+        driver: local
+    hackmd_index_db_data:
         driver: local
 
 networks:

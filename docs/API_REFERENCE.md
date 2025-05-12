@@ -110,7 +110,7 @@ Server configuration for KOI-net nodes.
 **Parameters:**
 
 - `host: str | None = "127.0.0.1"` - Server host address
-- `port: int | None = 8000` - Server port
+- `port: int | None = 8080` - Server port (default is 8080 for coordinator, see orchestrator.py SERVICE_PORTS for other node types)
 - `path: str | None = "/koi-net"` - Base path for API endpoints
 
 **Attributes:**
