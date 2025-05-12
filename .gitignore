@@ -1,4 +1,9 @@
 .venv
 __pycache__
 
-./koi-net-*
+koi-net-coordinator-node/
+koi-net-github-sensor-node/
+koi-net-hackmd-processor-node/
+koi-net-hackmd-sensor-node/
+koi-net-processor-gh-node/
+global.env
