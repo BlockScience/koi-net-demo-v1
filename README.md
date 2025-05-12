@@ -55,9 +55,6 @@ make github-processor-cli
 The `cli.py` script provides a more direct way to run commands without using Make.
 
 ```bash
-# Make the script executable
-chmod +x koi-nets-demo-v2/koin
-
 # Clone repositories and generate configurations
 python cli.py setup-all
 
@@ -78,13 +75,9 @@ python cli.py hackmd-processor
 
 # Run the HackMD processor CLI (shorter version of hackmd-processor-cli)
 python cli.py hackmd-cli
-# Or with a specific command:
-python cli.py hackmd-cli stats
 
 # Run the GitHub processor CLI (shorter version of github-processor-cli)
 python cli.py github-cli
-# Or with a specific command:
-python cli.py github-cli show-events BlockScience/koi-net
 
 # Show available commands
 python cli.py --help

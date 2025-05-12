@@ -97,7 +97,7 @@ services:
             context: ./koi-net-github-processor-node
             args:
                 - PORT=8011
-                - MODULE_NAME=processor_github_node
+                - MODULE_NAME=github_processor_node
         ports:
             - "8011:8011"
         env_file:
