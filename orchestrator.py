@@ -10,7 +10,7 @@ import shutil
 START_PORT = 8000
 COORD_URL = "http://127.0.0.1:{}"  # Will be formatted with coordinator port
 
-# Templates for each node type, based on merged_config.yaml
+# Templates for each node type, based on configs.txt
 NODE_CONFIGS = {
     "koi-net-coordinator-node": lambda port: {
         "server": {
@@ -20,7 +20,7 @@ NODE_CONFIGS = {
         },
         "koi_net": {
             "node_name": "coordinator",
-            "node_rid": None,
+            "node_rid": "orn:koi-net.node:coordinator+40610903-4272-4494-91fd-1e57501a0980",
             "node_profile": {
                 "base_url": f"http://127.0.0.1:{port}/koi-net",
                 "node_type": "FULL",
@@ -41,29 +41,30 @@ NODE_CONFIGS = {
             "path": "/koi-net"
         },
         "koi_net": {
-            "node_name": "github_sensor",
-            "node_rid": "orn:koi-net.node:github_sensor+383246c0-8c58-4331-9809-eb8ba2057204",
+            "node_name": "github-sensor",
+            "node_rid": "orn:koi-net.node:github-sensor+04075a17-b636-48e0-9e2b-104da4710e34",
             "node_profile": {
                 "base_url": f"http://127.0.0.1:{port}/koi-net",
                 "node_type": "FULL",
                 "provides": {
-                    "event": ["orn:github.commit"],
-                    "state": ["orn:github.commit"]
+                    "event": ["orn:github.event"],
+                    "state": ["orn:github.event"]
                 }
             },
-            "cache_directory_path": ".koi/cache",
-            "event_queues_path": ".koi/github/queues.json",
+            "cache_directory_path": ".koi/github_sensor_cache",
+            "event_queues_path": ".koi/queues.json",
             "first_contact": COORD_URL.format(START_PORT)
         },
-        "identity_directory_path": ".koi/github",
         "env": {
-            "github_api_token": "GITHUB_API_TOKEN",
+            "github_token": "GITHUB_TOKEN",
             "github_webhook_secret": "GITHUB_WEBHOOK_SECRET"
         },
         "github": {
-            "monitored_repos": [{"name": "BlockScience/koi-net"}],
-            "backfill_interval_seconds": 600,
-            "backfill_on_startup": True
+            "api_url": "https://api.github.com/",
+            "monitored_repositories": [{"name": "Blockscience/koi-net"}],
+            "backfill_max_items": 50,
+            "backfill_lookback_days": 30,
+            "backfill_state_file_path": ".koi/github/github_state.json"
         }
     },
     "koi-net-hackmd-sensor-node": lambda port: {
@@ -74,7 +75,7 @@ NODE_CONFIGS = {
         },
         "koi_net": {
             "node_name": "hackmd-sensor",
-            "node_rid": "orn:koi-net.node:hackmd-sensor+3ec03836-7843-4bc1-9165-b0ed2f1aa979",
+            "node_rid": "orn:koi-net.node:hackmd-sensor+c1311da2-023f-4ce5-a262-6b9a6db85dea",
             "node_profile": {
                 "base_url": f"http://127.0.0.1:{port}/koi-net",
                 "node_type": "FULL",
@@ -87,7 +88,6 @@ NODE_CONFIGS = {
             "event_queues_path": ".koi/hackmd/queues.json",
             "first_contact": COORD_URL.format(START_PORT)
         },
-        "identity_directory_path": ".koi/hackmd",
         "env": {
             "hackmd_api_token": "HACKMD_API_TOKEN"
         },
@@ -104,21 +104,25 @@ NODE_CONFIGS = {
         },
         "koi_net": {
             "node_name": "processor_github",
+            "node_rid": "orn:koi-net.node:processor_github+0bf78f28-9f56-4d31-8377-a33f49a0828e",
             "node_profile": {
+                "base_url": f"http://127.0.0.1:{port}/koi-net",
                 "node_type": "FULL",
                 "provides": {
                     "event": [],
                     "state": []
                 }
             },
-            "cache_directory_path": ".koi/processor-github",
+            "cache_directory_path": ".koi/processor-github/cache",
             "event_queues_path": ".koi/processor-github/queues.json",
-            "first_contact": COORD_URL.format(START_PORT),
-            "identity_directory_path": ".koi/processor_github",
-            "github_sensor_rid": ""
+            "first_contact": COORD_URL.format(START_PORT)
+        },
+        "index_db_path": ".koi/processor-github/index.db",
+        "env": {
+            "github_token": "GITHUB_TOKEN"
         }
     },
-    "koi-net-processor-hackmd-node": lambda port: {
+    "koi-net-hackmd-processor-node": lambda port: {
         "server": {
             "host": "127.0.0.1",
             "port": port,
@@ -126,7 +130,9 @@ NODE_CONFIGS = {
         },
         "koi_net": {
             "node_name": "processor_hackmd",
+            "node_rid": "orn:koi-net.node:processor_hackmd+62eabec3-ed43-4122-94cc-ea7aa8701fde",
             "node_profile": {
+                "base_url": f"http://127.0.0.1:{port}/koi-net",
                 "node_type": "FULL",
                 "provides": {
                     "event": [],
@@ -135,10 +141,12 @@ NODE_CONFIGS = {
             },
             "cache_directory_path": ".koi/processor-hackmd",
             "event_queues_path": ".koi/processor-hackmd/queues.json",
-            "first_contact": COORD_URL.format(START_PORT),
-            "identity_directory_path": ".koi/processor_hackmd",
-            "hackmd_sensor_rid": ""
-        }
+            "first_contact": COORD_URL.format(START_PORT)
+        },
+        "fetch_retry_initial": 30,
+        "fetch_retry_multiplier": 2,
+        "fetch_retry_max_attempts": 3,
+        "index_db_path": ".koi/index_db/index.db"
     }
 }
 
@@ -147,7 +155,7 @@ REPO_ORDER = [
     "koi-net-hackmd-sensor-node",
     "koi-net-github-sensor-node",
     "koi-net-processor-gh-node",
-    "koi-net-processor-hackmd-node"
+    "koi-net-hackmd-processor-node"
 ]
 
 # ---------------------
