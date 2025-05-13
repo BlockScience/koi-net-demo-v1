@@ -1,6 +1,16 @@
 # KOI-net Demo
 
-This document provides a straightforward guide for setting up and running the KOI-net distributed system.
+## 1. Overview
+
+This document outlines the design and user workflow of the KOI-net demo platform, focusing on the orchestration layer that facilitates setting up and running a distributed network of nodes for processing GitHub and HackMD data. The core purpose is to demonstrate a modular, event-driven microservice architecture.
+
+Key features include:
+*   Automated repository cloning and setup
+*   Configuration generation for different deployment contexts (local, Docker)
+*   Centralized command-line interface (`cli.py`) for common tasks
+*   Decoupled nodes communicating via a Coordinator
+
+The demo specifically highlights the flow of information from external sources (GitHub, HackMD) through dedicated sensor nodes, via a coordinator, to processor nodes where data is stored and made accessible via command-line tools. The orchestrator simplifies the deployment and interaction with this distributed system.
 
 ## System Overview
 
