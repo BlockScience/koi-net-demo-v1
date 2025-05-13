@@ -6,7 +6,9 @@
 
 ## Overview
 
-KOI-net Demo is a **demonstration platform** showcasing a modular, event-driven microservice architecture that processes GitHub and HackMD data. It showcases how distributed nodes can discover, communicate, and process data from external sources in a loosely coupled system. This demo features a powerful orchestration layer that simplifies deployment and management of the entire network. This is a proof-of-concept system designed for educational purposes, not production use.
+KOI-net Demo implements the KOI-NET protocol, which defines the standard communication patterns and coordination norms for Knowledge Organization Infrastructure (KOI) networks. Built on the RID protocol, KOI-NET allows heterogeneous nodes—each capable of autonomously inputting, processing, and outputting knowledge objects—to discover and exchange Resource Identifiers (RIDs) in a loosely coupled, event-driven architecture. Networks built with KOI-NET are fractal-like, meaning that a composition of nodes can behave as a single node at higher levels of topology. This repository provides the reference implementation, demos, and tooling: [BlockScience/koi-net](https://github.com/BlockScience/koi-net).
+
+This demo showcases a modular architecture where sensor nodes fetch data from GitHub and HackMD, processor nodes transform and store data, and a Coordinator manages discovery and messaging. It includes a flexible orchestration layer for both local and Docker-based deployments, along with command-line tools for system management. The project is intended as a proof of concept for educational purposes and is not designed for production use.
 
 **What This Demo Illustrates:**
 
