@@ -87,29 +87,29 @@ coordinator:
 	@echo "Running Coordinator Node..."
 	cd koi-net-coordinator-node && .venv/bin/python -m coordinator_node
 
-github-sensor:
+github-sensor: check-env
 	@echo "Running Github Sensor Node..."
 	cd koi-net-github-sensor-node && .venv/bin/python -m github_sensor_node
 
-hackmd-sensor:
+hackmd-sensor: check-env
 	@echo "Running HackMD Sensor Node..."
 	rm -rf koi-net-hackmd-sensor-node/node.sensor.log
 	cd koi-net-hackmd-sensor-node && .venv/bin/python -m hackmd_sensor_node
 
-github-processor:
+github-processor: check-env
 	@echo "Running GitHub Processor Node..."
 	cd koi-net-github-processor-node && .venv/bin/python -m github_processor_node
 
-hackmd-processor:
+hackmd-processor: check-env
 	@echo "Running HackMD Processor Node..."
 	rm -rf koi-net-hackmd-processor-node/node.proc.log
 	cd koi-net-hackmd-processor-node && .venv/bin/python -m hackmd_processor_node
 
-hackmd-processor-cli:
+hackmd-processor-cli: check-env
 	@echo "Running HackMD Processor Node CLI..."
 	cd koi-net-hackmd-processor-node && .venv/bin/python -m cli list
 
-github-processor-cli:
+github-processor-cli: check-env
 	@echo "Running GitHub Processor Node CLI..."
 	cd koi-net-github-processor-node && .venv/bin/python -m cli list-repos
 # Run all nodes in separate terminals
@@ -332,14 +332,14 @@ check-env:
 			echo "You can use your favorite text editor:"; \
 			echo "    nano global.env"; \
 			echo ""; \
-			exit 1; \
+			false; \
 		else \
 			echo "✅ Environment variables validated successfully."; \
 		fi; \
 	else \
 		echo "⚠️  [ERROR] global.env file not found!"; \
 		echo "Please run 'make demo-orchestrator' first to generate it."; \
-		exit 1; \
+		false; \
 	fi
 
 docker-demo: kill-ports clean-cache clean-docker-containers

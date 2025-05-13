@@ -21,6 +21,7 @@ Commands:
     docker-up            - Start all Docker services
     docker-down          - Stop all Docker services
     clean                - Clean up all generated files
+    clean-cache          - Remove problematic cache files while preserving API tokens
 """
 
 import argparse
@@ -131,6 +132,21 @@ def clean():
 
     print("Cleanup complete.")
 
+def clean_cache():
+    """Remove problematic cache files while preserving API tokens"""
+    print("Removing problematic files from cache directories (e.g., .DS_Store)...")
+    run_command("find . -name '.DS_Store' -type f -exec rm -f {} + 2>/dev/null || true", cwd=BASE_DIR)
+    
+    print("Removing cache directories and files...")
+    run_command("find . -name '.koi' -type d -exec rm -rf {} + 2>/dev/null || true", cwd=BASE_DIR)
+    run_command("find . -name '.rid_cache' -type d -exec rm -rf {} + 2>/dev/null || true", cwd=BASE_DIR)
+    run_command("find . -name 'event_queues.json' -type f -exec rm -f {} + 2>/dev/null || true", cwd=BASE_DIR)
+    run_command("find . -name 'config.yaml' -type f -exec rm -f {} + 2>/dev/null || true", cwd=BASE_DIR)
+    run_command("find . -name 'Dockerfile' -type f -exec rm -f {} + 2>/dev/null || true", cwd=BASE_DIR)
+    
+    print("Cache, config.yaml files, and Dockerfiles removed.")
+    print("NOTE: global.env file is preserved to maintain your API tokens.")
+
 def run_node(node_type):
     """Run a specific node"""
     if node_type not in NODE_CONFIGS:
@@ -202,6 +218,7 @@ def parse_args():
     # Setup commands
     subparsers.add_parser("setup-all", help="Clone repositories and generate configurations")
     subparsers.add_parser("clean", help="Clean up all generated files")
+    subparsers.add_parser("clean-cache", help="Remove problematic cache files while preserving API tokens")
 
     # Node commands
     for node in NODE_CONFIGS:
@@ -236,6 +253,8 @@ def main():
         setup_all()
     elif args.command == "clean":
         clean()
+    elif args.command == "clean-cache":
+        clean_cache()
     elif args.command == "docker-setup":
         docker_setup()
     elif args.command == "docker-up":
