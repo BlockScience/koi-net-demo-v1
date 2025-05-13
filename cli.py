@@ -6,7 +6,7 @@ This script provides a way to run all KOI-net commands without using make.
 It includes commands for setting up repositories, running nodes, and interacting with CLI tools.
 
 Usage:
-    python3 run_koi_net.py <command> [options]
+    python3 cli.py <command> [options]
 
 Commands:
     setup-all            - Clone repositories and generate configurations
@@ -136,14 +136,14 @@ def clean_cache():
     """Remove problematic cache files while preserving API tokens"""
     print("Removing problematic files from cache directories (e.g., .DS_Store)...")
     run_command("find . -name '.DS_Store' -type f -exec rm -f {} + 2>/dev/null || true", cwd=BASE_DIR)
-    
+
     print("Removing cache directories and files...")
     run_command("find . -name '.koi' -type d -exec rm -rf {} + 2>/dev/null || true", cwd=BASE_DIR)
     run_command("find . -name '.rid_cache' -type d -exec rm -rf {} + 2>/dev/null || true", cwd=BASE_DIR)
     run_command("find . -name 'event_queues.json' -type f -exec rm -f {} + 2>/dev/null || true", cwd=BASE_DIR)
     run_command("find . -name 'config.yaml' -type f -exec rm -f {} + 2>/dev/null || true", cwd=BASE_DIR)
     run_command("find . -name 'Dockerfile' -type f -exec rm -f {} + 2>/dev/null || true", cwd=BASE_DIR)
-    
+
     print("Cache, config.yaml files, and Dockerfiles removed.")
     print("NOTE: global.env file is preserved to maintain your API tokens.")
 
