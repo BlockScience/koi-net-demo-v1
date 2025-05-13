@@ -1,3 +1,23 @@
+FROM python:3.12-slim AS build
+
+# Install build dependencies and get UV via curl
+RUN apt-get update && \
+    apt-get install -y build-essential curl && \
+    curl -sSf https://astral.sh/uv/install.sh | sh && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy only requirements file first to leverage Docker cache
+COPY requirements.txt* ./
+
+# Install dependencies using UV for faster installation
+RUN if [ -f "requirements.txt" ]; then \
+        /root/.cargo/bin/uv pip install --system -r requirements.txt; \
+    fi
+
+# Final stage
 FROM python:3.12-slim
 
 # Accept module name and port as build arguments
@@ -10,22 +30,18 @@ ENV MODULE_NAME=$MODULE_NAME
 
 WORKDIR /app
 
-# Copy project files and source code
-COPY . /app/
-
-# Install curl for healthcheck and build dependencies
+# Install only runtime dependencies (curl for healthcheck)
 RUN apt-get update && \
-    apt-get install -y curl build-essential && \
+    apt-get install -y curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install dependencies from requirements.txt instead of editable mode
-RUN if [ -f "requirements.txt" ]; then \
-        pip install --no-cache-dir -r requirements.txt; \
-    else \
-        echo "No requirements.txt found, installing package directly"; \
-        pip install --no-cache-dir .; \
-    fi
+# Copy installed dependencies from build stage
+COPY --from=build /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
+COPY --from=build /usr/local/bin/ /usr/local/bin/
+
+# Copy project files and source code
+COPY . /app/
 
 # Expose port for container
 EXPOSE $PORT

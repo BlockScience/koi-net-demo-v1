@@ -393,13 +393,6 @@ def copy_docker_compose_template():
         console.print("[bold yellow]This file should be part of the repository in the templates directory.[/bold yellow]")
         return False
 
-    # Create config directory if needed for mounted volumes
-    config_dir = Path(__file__).parent / "config"
-    if not config_dir.exists():
-        os.makedirs(config_dir, exist_ok=True)
-        console.print(f"[bold green]Created directory: {config_dir}[/bold green]")
-
-
     # Create a modified copy of the docker-compose template with the correct ports
     with open(docker_compose_template, 'r') as src_file:
         template_content = src_file.read()
@@ -650,21 +643,21 @@ GITHUB_WEBHOOK_SECRET=
         console.print("[bold green]- Configuration URLs set for Docker networking[/bold green]")
         console.print("[bold green]- docker-compose.yml has been copied to project root[/bold green]")
         console.print("[bold green]- Ports assigned: 8080 (coordinator), 8001 (GitHub), 8002 (HackMD), 8011/8012 (processors)[/bold green]")
-        
-        # Check if any global.env file exists and has been validated
-        if global_env.exists():
-            with open(global_env, 'r') as env_file:
-                env_content = env_file.read()
-                if "GITHUB_TOKEN=" in env_content or "HACKMD_API_TOKEN=" in env_content or "GITHUB_WEBHOOK_SECRET=" in env_content:
-                    console.print("[bold red]⚠️  WARNING: One or more environment variables in global.env are not set![/bold red]")
-                    console.print("[bold red]The system will not work correctly without proper API tokens.[/bold red]")
-                    console.print("[bold yellow]- You can now run 'docker-compose up' to start the containers, but you MUST edit global.env first[/bold yellow]\n")
-                else:
-                    console.print("[bold green]- You can now run 'docker-compose up' to start the containers[/bold green]\n")
-        else:
-            console.print("[bold red]⚠️  WARNING: global.env file is missing! The system will not work correctly.[/bold red]")
-            console.print("[bold yellow]- Create a global.env file with your API tokens before running docker-compose[/bold yellow]\n")
-        
+
+        # # Check if any global.env file exists and has been validated
+        # if global_env.exists():
+        #     with open(global_env, 'r') as env_file:
+        #         env_content = env_file.read()
+        #         if "GITHUB_TOKEN=" in env_content or "HACKMD_API_TOKEN=" in env_content or "GITHUB_WEBHOOK_SECRET=" in env_content:
+        #             console.print("[bold red]⚠️  WARNING: One or more environment variables in global.env are not set![/bold red]")
+        #             console.print("[bold red]The system will not work correctly without proper API tokens.[/bold red]")
+        #             console.print("[bold yellow]- You can now run 'docker-compose up' to start the containers, but you MUST edit global.env first[/bold yellow]\n")
+        #         else:
+        #             console.print("[bold green]- You can now run 'docker-compose up' to start the containers[/bold green]\n")
+        # else:
+        #     console.print("[bold red]⚠️  WARNING: global.env file is missing! The system will not work correctly.[/bold red]")
+        #     console.print("[bold yellow]- Create a global.env file with your API tokens before running docker-compose[/bold yellow]\n")
+
         console.print("[bold yellow]Important Docker run instructions:[/bold yellow]")
         console.print("[bold yellow]1. Edit global.env in the project root to set your API tokens[/bold yellow]")
         console.print("[bold yellow]2. Run 'docker-compose build' to build the containers[/bold yellow]")
