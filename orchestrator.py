@@ -353,6 +353,72 @@ def install_requirements(repo_dir_str: str):
     else:
         console.print(f"No requirements.txt in {repo_dir_str}, skipping install.")
 
+def create_env_files(repo_dir, config_dict):
+    """
+    Create or update .env files in the repository directory
+
+    This function creates .env files in each repository with the necessary
+    environment variables such as GitHub tokens and HackMD API tokens.
+    
+    Args:
+        repo_dir: Repository directory path
+        config_dict: Configuration dictionary containing environment variables
+
+    Returns:
+        Path to the created .env file or None if no env variables exist
+    """
+    # Check if the config has env settings
+    if 'env' not in config_dict:
+        return None
+    
+    env_path = Path(repo_dir) / ".env"
+    env_content = []
+    
+    # Create or read existing .env file
+    if env_path.exists():
+        with open(env_path, 'r') as f:
+            env_content = f.readlines()
+            # Remove trailing newlines
+            env_content = [line.rstrip() for line in env_content]
+    
+    # Get global.env to extract token values
+    global_env_path = Path(__file__).parent / "global.env"
+    global_env_vars = {}
+    
+    if global_env_path.exists():
+        with open(global_env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    global_env_vars[key] = value
+    
+    # Process environment variables from the config
+    for env_var_name, env_var_key in config_dict['env'].items():
+        # Check if the env var already exists in the .env file
+        var_exists = False
+        for i, line in enumerate(env_content):
+            if line.startswith(f"{env_var_key}="):
+                # Update existing entry if we have a value from global.env
+                if env_var_key in global_env_vars and global_env_vars[env_var_key]:
+                    env_content[i] = f"{env_var_key}={global_env_vars[env_var_key]}"
+                var_exists = True
+                break
+        
+        # Add new entry if it doesn't exist
+        if not var_exists:
+            # Use value from global.env if available
+            value = global_env_vars.get(env_var_key, "")
+            env_content.append(f"{env_var_key}={value}")
+    
+    # Write the updated .env file
+    with open(env_path, 'w') as f:
+        for line in env_content:
+            f.write(line + '\n')
+    
+    console.print(f"[bold green]Created/updated .env file at {env_path}[/bold green]")
+    return env_path
+
 def copy_docker_compose_template():
     """
     Copy the docker-compose template to the project root
@@ -454,6 +520,17 @@ def main(is_docker=False):
         console.print(f"[bold cyan]Ensuring directory exists for global.env: {global_env.parent}[/bold cyan]")
         global_env.parent.mkdir(parents=True, exist_ok=True)
 
+        # Check if we already have existing values from an older global.env
+        existing_values = {}
+        if global_env.exists():
+            with open(global_env, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        if value:  # Only store non-empty values
+                            existing_values[key] = value
+
         if not global_env.exists():
             # First check if we have an example file to copy from
             console.print(f"[bold cyan]Checking existence of global.env.example at {global_env_example}[/bold cyan]")
@@ -461,7 +538,7 @@ def main(is_docker=False):
                 shutil.copy2(global_env_example, global_env)
                 console.print(f"[bold green]Copied global.env.example to {global_env}[/bold green]")
             else:
-                # Create a new file with helpful comments if no example exists
+                # Generate a new file with helpful comments if no example exists
                 console.print(f"[bold cyan]Creating a new global.env file at {global_env}[/bold cyan]")
                 with open(global_env, "w") as f:
                     f.write("""# Global environment variables for all KOI-net containers
@@ -471,15 +548,15 @@ def main(is_docker=False):
 # GitHub API token for accessing repository data
 # Create one at: https://github.com/settings/tokens
 # Required scopes: repo, read:org
-GITHUB_TOKEN=
+GITHUB_TOKEN""" + (f"={existing_values.get('GITHUB_TOKEN', '')}" if 'GITHUB_TOKEN' in existing_values else "=") + """
 
 # GitHub webhook secret for validating incoming webhooks
 # Can be any random string you create
-GITHUB_WEBHOOK_SECRET=
+GITHUB_WEBHOOK_SECRET""" + (f"={existing_values.get('GITHUB_WEBHOOK_SECRET', '')}" if 'GITHUB_WEBHOOK_SECRET' in existing_values else "=") + """
 
 # HackMD API token for accessing note data
 # Get this from your HackMD account settings
-HACKMD_API_TOKEN=
+HACKMD_API_TOKEN""" + (f"={existing_values.get('HACKMD_API_TOKEN', '')}" if 'HACKMD_API_TOKEN' in existing_values else "=") + """
 """)
                 console.print(f"[bold green]Created sample environment file: {global_env}[/bold green]")
         else:
@@ -539,6 +616,9 @@ HACKMD_API_TOKEN=
         first_contact = config_dict["koi_net"].get("first_contact", "")
         config_path = write_full_config(repo_dir, config_dict)
         install_requirements(repo_dir)
+        
+        # Create or update .env file for the repository
+        env_path = create_env_files(repo_dir, config_dict)
 
         # Generate Dockerfile if in Docker mode
         if is_docker:
