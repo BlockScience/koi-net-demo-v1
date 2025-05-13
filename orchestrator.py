@@ -197,7 +197,17 @@ def run(cmd, cwd=None):
     console.print(f"$ {' '.join(cmd)}" + (f" (in {cwd})" if cwd else ""))
     subprocess.run(cmd, check=True, cwd=cwd)
 
-def clone_repo(repo):
+def clone_repo(repo, branch="demo-1"):
+    """
+    Clone a repository and checkout a specific branch
+    
+    Args:
+        repo (str): Repository name to clone
+        branch (str): Branch name to checkout (default: demo-1)
+        
+    Returns:
+        str: Repository directory name
+    """
     # Handle legacy repo name in case it's still used elsewhere
     if repo == "koi-net-processor-gh-node":
         target_repo = "koi-net-github-processor-node"
@@ -212,9 +222,37 @@ def clone_repo(repo):
             repo = target_repo
 
     if not Path(repo).exists():
-        run(["git", "clone", f"https://github.com/BlockScience/{repo}", repo])
+        try:
+            # First try to clone with the specific branch
+            console.print(f"[bold cyan]Cloning {repo} with branch {branch}...[/bold cyan]")
+            run(["git", "clone", "-b", branch, f"https://github.com/BlockScience/{repo}", repo])
+            console.print(f"[bold green]Successfully cloned {repo} with branch {branch}[/bold green]")
+        except subprocess.CalledProcessError:
+            # If branch doesn't exist, fall back to default branch
+            console.print(f"[bold yellow]Branch {branch} not found in {repo}, falling back to default branch[/bold yellow]")
+            run(["git", "clone", f"https://github.com/BlockScience/{repo}", repo])
+            console.print(f"[bold green]Successfully cloned {repo} with default branch[/bold green]")
     else:
-        console.print(f"Repo {repo} already exists, skipping clone.")
+        console.print(f"Repo {repo} already exists, will try to update to {branch} branch.")
+        # Try to fetch and checkout the specified branch for existing repos
+        try:
+            run(["git", "fetch"], cwd=repo)
+            # Check if the branch exists remotely
+            result = subprocess.run(
+                ["git", "ls-remote", "--heads", "origin", branch], 
+                cwd=repo, 
+                capture_output=True, 
+                text=True
+            )
+            if branch in result.stdout:
+                # Branch exists, try to check it out
+                run(["git", "checkout", branch], cwd=repo)
+                console.print(f"[bold green]Successfully checked out {branch} branch in {repo}[/bold green]")
+            else:
+                console.print(f"[bold yellow]Branch {branch} does not exist in remote for {repo}[/bold yellow]")
+        except subprocess.CalledProcessError as e:
+            console.print(f"[bold red]Error updating {repo} to {branch} branch: {e}[/bold red]")
+            console.print(f"[bold yellow]Using existing repo state for {repo}[/bold yellow]")
     return repo
 
 def write_full_config(repo_dir, config_dict):
@@ -479,7 +517,7 @@ def copy_docker_compose_template():
 
     return True
 
-def main(is_docker=False):
+def main(is_docker=False, branch="demo-1"):
     """
     Main function to orchestrate KOI-net system setup
 
@@ -493,6 +531,7 @@ def main(is_docker=False):
     Args:
         is_docker (bool): Whether to run in Docker mode, which changes URLs for container networking
                           and generates Docker configuration files
+        branch (str): Git branch to checkout for each repository (default: demo-1)
 
     Configuration files created:
     - Each repo/config.yaml: Node configuration files
@@ -511,8 +550,6 @@ def main(is_docker=False):
     # Define global.env paths
     global_env = Path(__file__).parent / "global.env"
     global_env_example = Path(__file__).parent / "global.env.example"
-
-    # Port counter is no longer needed as we use the same ports for both modes
 
     # Always create global.env if it doesn't exist
     try:
@@ -586,7 +623,7 @@ HACKMD_API_TOKEN""" + (f"={existing_values.get('HACKMD_API_TOKEN', '')}" if 'HAC
     table.add_column("Config Path", style="white")
     table.add_column("First Contact", style="red")
     for i, repo in enumerate(REPO_ORDER):
-        repo_dir = clone_repo(repo)
+        repo_dir = clone_repo(repo, branch)
         # Use the same port for both Docker and local mode
         node_port = SERVICE_PORTS[repo]
         # Store the actual port used for display in the table
@@ -754,6 +791,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='KOI-net orchestrator script')
     parser.add_argument('--docker', dest='is_docker', action='store_true',
                         help='Run in Docker mode - uses fixed ports (8080,8001,8002,8011,8012), changes coordinator URL format for Docker networking, and generates docker-compose.yml, global.env, and Dockerfiles (default: False)')
+    parser.add_argument('--branch', dest='branch', default='demo-1',
+                        help='Git branch to checkout for each repository (default: demo-1)')
     args = parser.parse_args()
 
-    main(is_docker=args.is_docker)
+    main(is_docker=args.is_docker, branch=args.branch)
