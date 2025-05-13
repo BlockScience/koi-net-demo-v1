@@ -1,137 +1,105 @@
 # KOI-net Demo
 
-## 1. Overview
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![Docker](https://img.shields.io/badge/docker-supported-brightgreen.svg)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This document outlines the design and user workflow of the KOI-net demo platform, focusing on the orchestration layer that facilitates setting up and running a distributed network of nodes for processing GitHub and HackMD data. The core purpose is to demonstrate a modular, event-driven microservice architecture.
+## Overview
 
-Key features include:
-*   Automated repository cloning and setup
-*   Configuration generation for different deployment contexts (local, Docker)
-*   Centralized command-line interface (`cli.py`) for common tasks
-*   Decoupled nodes communicating via a Coordinator
+KOI-net Demo is a **demonstration platform** showcasing a modular, event-driven microservice architecture that processes GitHub and HackMD data. It showcases how distributed nodes can discover, communicate, and process data from external sources in a loosely coupled system. This demo features a powerful orchestration layer that simplifies deployment and management of the entire network. This is a proof-of-concept system designed for educational purposes, not production use.
 
-The demo specifically highlights the flow of information from external sources (GitHub, HackMD) through dedicated sensor nodes, via a coordinator, to processor nodes where data is stored and made accessible via command-line tools. The orchestrator simplifies the deployment and interaction with this distributed system.
+**What This Demo Illustrates:**
 
-## System Overview
+- Microservice architecture principles with decoupled components
+- Event-driven communication patterns
+- Distributed data processing workflows
+- Automated deployment and configuration generation
 
-KOI-net consists of the following components:
-- Coordinator node (central point for node discovery)
-- GitHub Sensor node (monitors GitHub repositories)
-- HackMD Sensor node (monitors HackMD notes)
-- GitHub Processor node (processes GitHub events)
-- HackMD Processor node (processes HackMD events)
+**Key Demo Features:**
+
+- Automated repository cloning and setup
+- Dynamic configuration generation for local and Docker deployments
+- Centralized command-line interface for system management
+- Decoupled nodes communicating via a Coordinator
+
+The demo shows data flow from external sources through sensor nodes, via a coordinator, to processor nodes where data is stored and made accessible through CLI tools.
+
+### Demo Architecture
+
+![](diagrams/mermaid-arch.png)
+
+**How This Demo Works:**
+
+1. **Orchestration**: Users interact with setup tools to deploy demonstration nodes
+2. **Runtime Components**:
+   - Coordinator manages node discovery and registration
+   - Sensors collect data from GitHub and HackMD APIs
+   - Processors transform and store data for analysis
+   - All components use RID (Resource Identifier) exchange
+
+![](diagrams/mermaid-data.png)
+
+**Demo Data Flow:**
+
+1. **Collection**: Sensor nodes fetch external data from GitHub and HackMD
+2. **Discovery**: Sensors register with the Coordinator for system-wide visibility
+3. **Exchange**: RIDs facilitate standardized event communication
+4. **Processing**: Data moves through event handlers to services
+5. **Storage**: Processed data is indexed in structured databases
+6. **Access**: CLI and REST interfaces provide query capabilities
+7. **Monitoring**: Continuous updates create a live processing stream
+
+### Demo Node Architecture
+
+This demonstration uses specialized nodes in a decentralized, event-driven architecture:
+
+**Coordinator Node (Port 8080)**
+
+- Central registry for service discovery
+- Enables dynamic node registration
+- Maintains network topology
+- First node to start in the system
+
+**Sensor Nodes**
+
+- **GitHub Sensor (Port 8001)**: Monitors repositories, generates event RIDs
+- **HackMD Sensor (Port 8002)**: Tracks note changes, creates event RIDs
+
+**Processor Nodes**
+
+- **GitHub Processor (Port 8011)**: Consumes GitHub events, indexes repository data
+- **HackMD Processor (Port 8012)**: Processes note content, enables search and history tracking
+
+Each node operates independently with its own configuration, database, and API.
 
 ## Prerequisites
 
 - Python 3.12+
-- Docker and Docker Compose v2+ (for Docker mode)
+- Docker and Docker Compose v2+ (for Docker deployment)
 - Git
-- Make (or see alternatives in the Implementation Details section)
+- Make (optional, see Implementation Details for alternatives)
 
-## Setup Options
+> **Note:** This demo has been tested primarily on macOS systems. While it should work on other platforms, some commands or behaviors might differ slightly on Linux or Windows.
 
-### Option 1: Local Development Setup
+## Running the Demo
 
-#### Option A: Using Make
-
-```bash
-# Clone repositories and generate configurations
-make setup-all
-
-# Run the coordinator node (run in a separate terminal)
-make coordinator
-
-# Run the GitHub sensor node (run in a separate terminal)
-make github-sensor
-
-# Run the HackMD sensor node (run in a separate terminal)
-make hackmd-sensor
-
-# Run the GitHub processor node (run in a separate terminal)
-make github-processor
-
-# Run the HackMD processor node (run in a separate terminal)
-make hackmd-processor
-
-# Run the HackMD processor node CLI tool to inspect the HackMD events (run in a separate terminal)
-make hackmd-processor-cli
-
-# Run the GitHub processor node CLI tool to inspect the GitHub events (run in a separate terminal)
-make github-processor-cli
-```
-
-#### Option B: Using the command-line tool
-
-The `cli.py` script provides a more direct way to run commands without using Make.
+### Option 1: Docker Setup (Recommended for Demo)
 
 ```bash
-# Clone repositories and generate configurations
-python cli.py setup-all
-
-# Run the coordinator node (run in a separate terminal)
-python cli.py coordinator
-
-# Run the GitHub sensor node (run in a separate terminal)
-python cli.py github-sensor
-
-# Run the HackMD sensor node (run in a separate terminal)
-python cli.py hackmd-sensor
-
-# Run the GitHub processor node (run in a separate terminal)
-python cli.py github-processor
-
-# Run the HackMD processor node (run in a separate terminal)
-python cli.py hackmd-processor
-
-# Run the HackMD processor CLI (shorter version of hackmd-processor-cli)
-python cli.py hackmd-cli
-
-# Run the GitHub processor CLI (shorter version of github-processor-cli)
-python cli.py github-cli
-
-# Show available commands
-python cli.py --help
-```
-
-### Option 2: Docker Setup (Recommended)
-
-```bash
-# All-in-one command to set up, build, and start KOI-net
+# All-in-one command to set up, build, and start the KOI-net demo
 make docker-demo
 ```
 
 This will:
+
 1. Clean the environment
 2. Generate Docker configurations
-3. Build all Docker containers
+3. Build all containers
 4. Start all services
-5. Wait for all services to be healthy
-6. Display system status using CLI tools
+5. Verify service health
+6. Display system status
 
-#### Setting up API Tokens
-
-Before running the services, you need to add your API tokens to the `global.env` file created in the project root:
-
-```bash
-# Edit the global.env file
-nano global.env
-```
-
-Add the following environment variables with your actual tokens:
-
-```
-# GitHub Personal Access Token
-GITHUB_TOKEN=your_github_token_here
-
-# GitHub Webhook Secret (any random string you create)
-GITHUB_WEBHOOK_SECRET=your_webhook_secret_here
-
-# HackMD API Token
-HACKMD_API_TOKEN=your_hackmd_token_here
-```
-These tokens are required for the sensors to access GitHub repositories and HackMD notes.
-
-Alternatively, you can perform each step manually:
+For manual demo setup:
 
 ```bash
 # Generate Docker configurations
@@ -144,9 +112,72 @@ docker compose up -d
 make down
 ```
 
+### Option 2: Local Development Setup
+
+#### Using Make
+
+```bash
+# Clone repositories and generate configurations
+make setup-all
+
+# Run nodes (each in a separate terminal)
+make coordinator
+make github-sensor
+make hackmd-sensor
+make github-processor
+make hackmd-processor
+
+# Run CLI tools
+make hackmd-processor-cli
+make github-processor-cli
+```
+
+#### Using the CLI Tool
+
+```bash
+# Clone repositories and generate configurations
+python cli.py setup-all
+
+# Run nodes (each in a separate terminal)
+python cli.py coordinator
+python cli.py github-sensor
+python cli.py hackmd-sensor
+python cli.py github-processor
+python cli.py hackmd-processor
+
+# Run CLI tools
+python cli.py hackmd-cli
+python cli.py github-cli
+
+# Show available commands
+python cli.py --help
+```
+
+## API Token Setup
+
+Before running the demo, add your API tokens to the `global.env` file in the project root:
+
+```bash
+# Edit the global.env file
+nano global.env
+```
+
+Add these environment variables:
+
+```
+# GitHub Personal Access Token
+GITHUB_TOKEN=your_github_token_here
+
+# GitHub Webhook Secret (any random string)
+GITHUB_WEBHOOK_SECRET=your_webhook_secret_here
+
+# HackMD API Token
+HACKMD_API_TOKEN=your_hackmd_token_here
+```
+
 ## Port Configuration
 
-The system uses the following port mapping for both local and Docker modes:
+The demonstration uses consistent port mapping across deployment modes:
 
 ```
 - Coordinator: 8080
@@ -156,149 +187,79 @@ The system uses the following port mapping for both local and Docker modes:
 - HackMD Processor: 8012
 ```
 
-To see current port assignments:
+View current port assignments:
+
 ```bash
 make show-ports
 ```
 
-## CLI Tools and Data Exploration
+## CLI Tools
 
-KOI-net includes powerful CLI tools for exploring GitHub repositories and HackMD notes in the system.
+The KOI-net demo provides CLI tools for data exploration.
 
-### GitHub CLI Operations
+### GitHub CLI Commands
 
-#### List Tracked Repositories
 ```bash
+# List tracked repositories
 make demo-github-cli
-```
-or directly:
-```bash
+# or directly:
 docker compose exec github-processor python -m cli list-repos
-```
 
-#### View GitHub Event Summary
-```bash
+# View event summary
 docker compose exec github-processor python -m cli summary
-```
 
-#### Show Events for a Repository
-```bash
+# Show repository events
 docker compose exec github-processor python -m cli show-events BlockScience/koi-net
-```
 
-#### Add a New Repository to Track
-```bash
+# Add repository to track
 docker compose exec github-processor python -m cli add-repo BlockScience/koios
-```
 
-#### View Details for a Specific Event
-```bash
+# View event details
 docker compose exec github-processor python -m cli event-details <event_rid>
 ```
 
-### HackMD CLI Operations
+### HackMD CLI Commands
 
-#### List All Notes
 ```bash
+# List all notes
 make demo-hackmd-cli
-```
-or directly:
-```bash
+# or directly:
 docker compose exec hackmd-processor python -m cli list
-```
 
-#### Display Note Statistics
-```bash
+# Display note statistics
 docker compose exec hackmd-processor python -m cli stats
-```
 
-#### View a Specific Note
-```bash
+# View a specific note
 docker compose exec hackmd-processor python -m cli show C1xso4C8SH-ZzDaloTq4Uw
-```
 
-#### Show Note History
-```bash
+# Show note history
 docker compose exec hackmd-processor python -m cli history C1xso4C8SH-ZzDaloTq4Uw
-```
 
-#### Search Notes by Content
-```bash
+# Search notes by content
 docker compose exec hackmd-processor python -m cli search "koi-net"
-```
 
-#### Filter Notes by Conditions
-```bash
+# Filter notes
 docker compose exec hackmd-processor python -m cli list --limit 10 --search koi
 ```
 
-### CLI Help
-
-To see all available CLI commands and examples:
-```bash
-make cli-help
-```
-
-For detailed help on specific commands:
-```bash
-docker compose exec github-processor python -m cli --help
-docker compose exec github-processor python -m cli show-events --help
-```
-
-## System Management
-
-### Monitor Service Status
-```bash
-make docker-status
-```
-
-### View Service Logs
-```bash
-make docker-logs
-```
-
-### Interactive Resource Monitoring
-```bash
-make docker-monitor
-```
-
-### Rebuild Docker Configuration
-```bash
-make docker-regenerate
-```
-
-## Working with Individual Services
-
-### Run services individually in Docker:
+### Individual Services
 
 ```bash
-# Start only the coordinator
+# Start individual demo services
 make demo-coordinator
-
-# Start only the GitHub sensor
 make demo-github-sensor
-
-# Start only the HackMD sensor
 make demo-hackmd-sensor
-
-# Start only the GitHub processor
 make demo-github-processor
-
-# Start only the HackMD processor
 make demo-hackmd-processor
-```
 
-### Rebuild Docker images:
-
-```bash
-# Rebuild all Docker images (no cache)
+# Rebuild Docker images (no cache)
 make docker-rebuild
 ```
 
 ## Environment Management
 
 ```bash
-# Clean up all environments, caches, and build artifacts
+# Clean up all environments and artifacts
 make clean
 
 # Clean only cache directories
@@ -307,102 +268,53 @@ make clean-cache
 # Clean only virtual environments
 make clean-venv
 
-# Kill processes using KOI-net ports (8080, 8001, 8002, 8011, 8012)
+# Kill processes using KOI-net demo ports
 make kill-ports
 ```
 
 ## Troubleshooting
 
-If CLI commands return with "No repositories found" or "No notes found":
-1. Ensure all services are healthy: `make docker-status`
-2. Check service logs for errors: `make docker-logs`
-3. Verify your API tokens in `global.env` are correct and have proper permissions
-4. Wait a bit longer for initial data synchronization
+If you encounter "No repositories found" or "No notes found" in the demo:
+
+1. Check service health: `make docker-status`
+2. View logs for errors: `make docker-logs`
+3. Verify API tokens in `global.env`
+4. Allow time for initial data synchronization
 
 ### Common Issues
 
-- **Authentication errors**: Check your API tokens in `global.env`. The GitHub token needs `repo` and `read:org` scopes.
-- **Missing repositories**: Use `docker compose exec github-processor python -m cli add-repo owner/repo` to manually add repositories.
-- **No HackMD notes**: Ensure your HackMD API token has access to the team workspace.
-- **Health check failures**: Some services may fail health checks initially. Check logs with `docker logs koi-nets-demo-v1-coordinator-1` or use `make docker-logs` to troubleshoot.
-- **"Unknown filter health" error**: If you see this error, your Docker Compose version might not support filtering by health status. Update Docker Compose or use `docker ps` to check container health status directly.
-- **Port already in use**: If you see errors about ports being in use, run `make kill-ports` to terminate processes using the KOI-net ports.
+- **Authentication errors**: Check your API tokens. GitHub token needs `repo` and `read:org` scopes.
+- **Missing repositories**: Add repositories manually with `docker compose exec github-processor python -m cli add-repo owner/repo`.
+- **No HackMD notes**: Ensure your HackMD API token has workspace access.
+- **Health check failures**: Services may take time to initialize. Check logs with `make docker-logs`.
+- **"Unknown filter health" error**: Update Docker Compose or use `docker ps` to check container status.
+- **Port conflicts**: Run `make kill-ports` to free KOI-net demo ports.
 
 ## Implementation Details
 
-The system is orchestrated through three main components:
+This demonstration uses three main components:
 
-1. `orchestrator.py`: Handles repository cloning, configuration generation, and Docker setup
-2. `Makefile`: Provides command targets for common operations
-3. `docker-compose.yml`: (Generated) Defines service configuration for Docker deployment
-
-Each node runs as an independent service, connecting to the coordinator for network discovery.
-
-### Alternative to Make
-
-#### Option 1: Using the koin Command Line Tool
-
-The project includes a convenient command line tool (`koin`) that provides all the functionality of the Makefile:
-
-```bash
-# Make the script executable (only needs to be done once)
-chmod +x koi-nets-demo-v2/koin
-
-# Generate Docker configurations
-python cli.py docker-setup
-
-# Start all services
-python cli.py docker-up
-
-# Check status
-python cli.py docker-status
-
-# Show all CLI tools available
-python cli.py --help
-
-# Stop all services
-python cli.py docker-down
-```
-
-#### Option 2: Direct Docker Commands
-
-You can also run the Docker commands directly:
-
-```bash
-# Generate configs with Docker support
-python orchestrator.py --docker
-
-# Build and start services
-docker compose up -d
-
-# Check status
-docker ps
-
-# Stop services
-docker compose down
-```
+1. `orchestrator.py`: Handles cloning, configuration, and Docker setup
+2. `Makefile`: Provides command targets
+3. `docker-compose.yml`: (Generated) Defines service configuration
 
 ## Docker Technical Details
 
-- Uses Python 3.12 slim image as base
-- Installs dependencies from requirements.txt using standard pip (not editable mode)
-- Configures each service with appropriate networking setup
-- Uses healthchecks with path `/koi-net/health` to ensure services are properly initialized
-- Preserves `global.env` file between runs to maintain API tokens
-- Regenerates all other configuration files automatically
-- Smart fallback to standard package installation if requirements.txt is not found
+- Uses Python 3.12 slim base image
+- Installs dependencies from requirements.txt
+- Configures networking and health checks
+- Preserves API tokens between runs
+- Regenerates configurations automatically
 
 ### Environment Variables
 
-The system uses the following environment variables:
+| Variable                | Purpose                      | Required by                     |
+| ----------------------- | ---------------------------- | ------------------------------- |
+| `GITHUB_TOKEN`          | GitHub Personal Access Token | GitHub Sensor, GitHub Processor |
+| `GITHUB_WEBHOOK_SECRET` | Webhook validation secret    | GitHub Sensor                   |
+| `HACKMD_API_TOKEN`      | HackMD API access token      | HackMD Sensor, HackMD Processor |
 
-| Variable | Purpose | Required by |
-|----------|---------|-------------|
-| `GITHUB_TOKEN` | GitHub Personal Access Token for API access | GitHub Sensor, GitHub Processor |
-| `GITHUB_WEBHOOK_SECRET` | Secret for validating GitHub webhooks | GitHub Sensor |
-| `HACKMD_API_TOKEN` | HackMD API token for accessing notes | HackMD Sensor, HackMD Processor |
+### Demo Database Locations
 
-## Database Locations
-
-- GitHub event database: `/app/.koi/github-processor/index.db` in the github-processor container
-- HackMD note database: `/app/.koi/index_db/index.db` in the hackmd-processor container
+- GitHub event database: `/app/.koi/index.db` in the github-processor container
+- HackMD note database: `/app/.koi/index.db` in the hackmd-processor container
