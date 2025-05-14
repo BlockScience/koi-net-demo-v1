@@ -200,11 +200,11 @@ def run(cmd, cwd=None):
 def clone_repo(repo, branch="demo-1"):
     """
     Clone a repository and checkout a specific branch
-    
+
     Args:
         repo (str): Repository name to clone
         branch (str): Branch name to checkout (default: demo-1)
-        
+
     Returns:
         str: Repository directory name
     """
@@ -239,9 +239,9 @@ def clone_repo(repo, branch="demo-1"):
             run(["git", "fetch"], cwd=repo)
             # Check if the branch exists remotely
             result = subprocess.run(
-                ["git", "ls-remote", "--heads", "origin", branch], 
-                cwd=repo, 
-                capture_output=True, 
+                ["git", "ls-remote", "--heads", "origin", branch],
+                cwd=repo,
+                capture_output=True,
                 text=True
             )
             if branch in result.stdout:
@@ -397,7 +397,7 @@ def create_env_files(repo_dir, config_dict):
 
     This function creates .env files in each repository with the necessary
     environment variables such as GitHub tokens and HackMD API tokens.
-    
+
     Args:
         repo_dir: Repository directory path
         config_dict: Configuration dictionary containing environment variables
@@ -408,21 +408,21 @@ def create_env_files(repo_dir, config_dict):
     # Check if the config has env settings
     if 'env' not in config_dict:
         return None
-    
+
     env_path = Path(repo_dir) / ".env"
     env_content = []
-    
+
     # Create or read existing .env file
     if env_path.exists():
         with open(env_path, 'r') as f:
             env_content = f.readlines()
             # Remove trailing newlines
             env_content = [line.rstrip() for line in env_content]
-    
+
     # Get global.env to extract token values
     global_env_path = Path(__file__).parent / "global.env"
     global_env_vars = {}
-    
+
     if global_env_path.exists():
         with open(global_env_path, 'r') as f:
             for line in f:
@@ -430,7 +430,7 @@ def create_env_files(repo_dir, config_dict):
                 if line and not line.startswith('#') and '=' in line:
                     key, value = line.split('=', 1)
                     global_env_vars[key] = value
-    
+
     # Process environment variables from the config
     for env_var_name, env_var_key in config_dict['env'].items():
         # Check if the env var already exists in the .env file
@@ -442,18 +442,18 @@ def create_env_files(repo_dir, config_dict):
                     env_content[i] = f"{env_var_key}={global_env_vars[env_var_key]}"
                 var_exists = True
                 break
-        
+
         # Add new entry if it doesn't exist
         if not var_exists:
             # Use value from global.env if available
             value = global_env_vars.get(env_var_key, "")
             env_content.append(f"{env_var_key}={value}")
-    
+
     # Write the updated .env file
     with open(env_path, 'w') as f:
         for line in env_content:
             f.write(line + '\n')
-    
+
     console.print(f"[bold green]Created/updated .env file at {env_path}[/bold green]")
     return env_path
 
@@ -652,10 +652,13 @@ HACKMD_API_TOKEN""" + (f"={existing_values.get('HACKMD_API_TOKEN', '')}" if 'HAC
         cache_path = config_dict["koi_net"]["cache_directory_path"]
         first_contact = config_dict["koi_net"].get("first_contact", "")
         config_path = write_full_config(repo_dir, config_dict)
-        install_requirements(repo_dir)
-        
+        if not is_docker:
+            install_requirements(repo_dir)
+        else:
+            console.print(f"[bold yellow]Skipping dependency installation for {repo_dir} (Docker mode)[/bold yellow]")
+
         # Create or update .env file for the repository
-        env_path = create_env_files(repo_dir, config_dict)
+        create_env_files(repo_dir, config_dict)
 
         # Generate Dockerfile if in Docker mode
         if is_docker:
@@ -678,7 +681,7 @@ HACKMD_API_TOKEN""" + (f"={existing_values.get('HACKMD_API_TOKEN', '')}" if 'HAC
             first_contact or "-"
         )
 
-    console.print(f"\nAll repos cloned, config.yaml written, and requirements installed with standard pip/venv.\n")
+    console.print("\nAll repos cloned and config.yaml written. Requirements installed with standard pip/venv (skipped under Docker mode).\n")
     console.print(table)
 
     console.print("\n[bold cyan]Port Configuration (All Modes):[/bold cyan]")
