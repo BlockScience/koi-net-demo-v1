@@ -6,9 +6,16 @@
 
 ## Overview
 
-This demo showcases a modular architecture where sensor nodes fetch data from GitHub and HackMD, processor nodes transform and store data, and a Coordinator manages discovery and messaging. It is built upon the [KOI-Net Protocol](https://github.com/BlockScience/koi-net). It includes a flexible orchestration layer for both local and Docker-based deployments, along with command-line tools for system management. The project is intended as a proof of concept for educational purposes and is not designed for production use.
+This demo showcases a modular knowledge processing network implemented using the KOI-net protocol. The example network is composed of five nodes: a coordinator node for facilitating node discovery, two sensors nodes pulling data from GitHub and HackMD, and two processor nodes for transforming and storing that data. It includes a flexible orchestration layer for both local and Docker-based deployments, along with command-line tools for system management. The project is intended as a proof of concept for educational purposes and is not designed for production use.
 
-> **Note:** The KOI-net protocol defines the standard communication patterns and coordination norms needed to establish and maintain Knowledge Organization Infrastructure (KOI) networks. KOI-nets are heterogenous compositions of KOI nodes, each of which is capable of autonomously inputting, processing, and outputting knowledge. The behavior of each node and configuration of each network can vary greatly, thus the protocol is designed to be a simple and flexible but interoperable foundation for future projects to build on. The protocol only governs communication between nodes, not how they operate internally. As a result we consider KOI-nets to be fractal-like, in that a network of nodes may act like a single node from an outside perspective. For more information on the KOI-Net protocol upon which this demo is built, please refer to the [KOI-Net Protocol repo](https://github.com/BlockScience/koi-net).
+The KOI-net protocol defines the standard communication patterns and coordination norms needed to establish and maintain Knowledge Organization Infrastructure (KOI) networks. KOI-nets are heterogenous compositions of KOI nodes, each of which is capable of autonomously inputting, processing, and outputting knowledge. The behavior of each node and configuration of each network can vary greatly, thus the protocol is designed to be a simple and flexible but interoperable foundation for future projects to build on. The protocol only governs communication between nodes, not how they operate internally. As a result we consider KOI-nets to be fractal-like, in that a network of nodes may act like a single node from an outside perspective. For more information on the KOI-net protocol upon which this demo is built, please refer to the [KOI-net repo](https://github.com/BlockScience/koi-net).
+
+**Node repositories used in this demo:**
+- [koi-net-coordinator-node](https://github.com/BlockScience/koi-net-coordinator-node)
+- [koi-net-hackmd-sensor-node](https://github.com/BlockScience/koi-net-hackmd-sensor-node)
+- [koi-net-github-sensor-node](https://github.com/BlockScience/koi-net-github-sensor-node)
+- [koi-net-hackmd-processor-node](https://github.com/BlockScience/koi-net-hackmd-processor-node)
+- [koi-net-github-processor-node](https://github.com/BlockScience/koi-net-github-processor-node)
 
 **What This Demo Illustrates:**
 
@@ -65,7 +72,7 @@ This demonstration uses specialized nodes in a decentralized, event-driven archi
 **Sensor Nodes**
 
 - **GitHub Sensor (Port 8001)**: Monitors repositories, generates event RIDs
-- **HackMD Sensor (Port 8002)**: Tracks note changes, creates event RIDs
+- **HackMD Sensor (Port 8002)**: Tracks note changes, generates event RIDs
 
 **Processor Nodes**
 
