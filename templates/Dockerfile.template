@@ -1,62 +1,63 @@
-FROM python:3.12-slim AS build
+########################################################
+# Builder stage: install uv and Python dependencies
+########################################################
+FROM python:3.12-slim-bookworm AS builder
 
-# Install build dependencies and get UV via curl with proper installation path
-RUN apt-get update && \
-    apt-get install -y build-essential curl && \
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-    . $HOME/.cargo/env && \
-    curl -sSf https://astral.sh/uv/install.sh | sh && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
-
-# Copy only requirements file first to leverage Docker cache
-COPY requirements.txt* ./
-
-# Install dependencies with UV if available, fall back to pip if UV fails
-RUN if [ -f "requirements.txt" ]; then \
-        if [ -f "$HOME/.cargo/bin/uv" ]; then \
-            . $HOME/.cargo/env && \
-            $HOME/.cargo/bin/uv pip install --system -r requirements.txt; \
-        else \
-            pip install --no-cache-dir -r requirements.txt; \
-        fi; \
-    fi
-
-# Final stage
-FROM python:3.12-slim
-
-# Accept module name and port as build arguments
 ARG MODULE_NAME
 ARG PORT=8080
+ENV MODULE_NAME=${MODULE_NAME}
+ENV PORT=${PORT}
 
-# Set environment variables from build args
-ENV PORT=$PORT
-ENV MODULE_NAME=$MODULE_NAME
+# 1. Install curl and build tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# 2. Copy uv CLI
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Install only runtime dependencies (curl for healthcheck)
-RUN apt-get update && \
-    apt-get install -y curl && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# 3. Copy requirements.txt only (no pyproject.toml or uv.lock)
+COPY requirements.txt .
 
-# Copy installed dependencies from build stage
-COPY --from=build /usr/local/lib/python3.12/site-packages/ /usr/local/lib/python3.12/site-packages/
-COPY --from=build /usr/local/bin/ /usr/local/bin/
+# 4. Create a virtualenv and install dependencies into it
+RUN uv venv /app/.venv && \
+    uv pip install --python=/app/.venv/bin/python -r requirements.txt
 
-# Copy project files and source code
-COPY . /app/
+# 5. Copy application source
+COPY . /app
 
-# Expose port for container
-EXPOSE $PORT
+########################################################
+# Runtime stage: minimal Python + curl + clean .venv
+########################################################
+FROM python:3.12-slim-bookworm AS runtime
 
-# Configure healthcheck
+ARG MODULE_NAME
+ARG PORT=8080
+ENV MODULE_NAME=${MODULE_NAME}
+ENV PORT=${PORT}
+
+WORKDIR /app
+
+# 1. Install curl for healthcheck support
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl && rm -rf /var/lib/apt/lists/*
+
+# 2. Copy .venv from builder
+COPY --from=builder /app/.venv /app/.venv
+
+# 3. Activate .venv
+ENV VIRTUAL_ENV=/app/.venv
+ENV PATH="/app/.venv/bin:$PATH"
+
+# 4. Copy app source
+COPY . /app
+
+EXPOSE ${PORT}
+
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD curl --fail http://localhost:$PORT/health || exit 1
+  CMD curl --fail http://0.0.0.0:${PORT}/health
 
-# Start server using environment variables
-# The module name is used to determine which server module to load
-CMD uvicorn $MODULE_NAME.server:app --host 0.0.0.0 --port $PORT
+# 5. Entrypoint using dynamic module name
+CMD ["uvicorn", "--host", "0.0.0.0", "--port", "${PORT}", "${MODULE_NAME}.server:app"]

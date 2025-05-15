@@ -1,161 +1,113 @@
+# anchor for common environment entries
+x-common-env: &common-env
+    RUN_CONTEXT: docker
+    KOI_CONFIG_MODE: docker
+    RID_CACHE_DIR: /data/cache
+
+# anchor for cache volume mapping
+x-cache-vol: &cache-vol
+    - cache_data:${RID_CACHE_DIR}
+
+# anchor for service defaults
+x-service-defaults: &service-defaults
+    env_file:
+        - ./global.env
+    environment:
+        <<: *common-env
+    volumes:
+        - cache_data:${RID_CACHE_DIR}
+    restart: unless-stopped
+    networks:
+        - koinet
+
 services:
     coordinator:
+        <<: *service-defaults
+        environment:
+            PORT: 8080
         build:
             context: ./koi-net-coordinator-node
             args:
-                - PORT=8080
-                - MODULE_NAME=coordinator_node
+                MODULE_NAME: coordinator_node
+                PORT: 8080
         ports:
             - "8080:8080"
-        env_file:
-            - ./global.env
-        environment:
-            - RUN_CONTEXT=docker
-            - KOI_CONFIG_MODE=docker
-            - RID_CACHE_DIR=/data/cache
-            - PORT=8080
         volumes:
-            - cache_data:${RID_CACHE_DIR:-/data/cache}
             - coordinator_state_data:/app/.koi
-        restart: unless-stopped
-        networks:
-            - koinet
-        healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8080/health"]
-            interval: 30s
-            timeout: 5s
-            retries: 3
-            start_period: 15s
 
     github-sensor:
+        <<: *service-defaults
+        environment:
+            PORT: 8001
         build:
             context: ./koi-net-github-sensor-node
             args:
-                - PORT=8001
-                - MODULE_NAME=github_sensor_node
+                MODULE_NAME: github_sensor_node
+                PORT: 8001
         ports:
             - "8001:8001"
-        env_file:
-            - ./global.env
-        environment:
-            - RUN_CONTEXT=docker
-            - KOI_CONFIG_MODE=docker
-            - RID_CACHE_DIR=/data/cache
-            - PORT=8001
-        volumes:
-            - cache_data:${RID_CACHE_DIR:-/data/cache}
-            - github_state_data:/app/.koi/github_sensor_cache
         depends_on:
             coordinator:
                 condition: service_healthy
-        restart: unless-stopped
-        networks:
-            - koinet
-        healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8001/health"]
-            interval: 30s
-            timeout: 5s
-            retries: 3
-            start_period: 15s
+        volumes:
+            - github_state_data:/app/.koi/github_sensor_cache
 
     hackmd-sensor:
+        <<: *service-defaults
+        environment:
+            PORT: 8002
         build:
             context: ./koi-net-hackmd-sensor-node
             args:
-                - PORT=8002
-                - MODULE_NAME=hackmd_sensor_node
+                MODULE_NAME: hackmd_sensor_node
+                PORT: 8002
         ports:
             - "8002:8002"
-        env_file:
-            - ./global.env
-        environment:
-            - RUN_CONTEXT=docker
-            - KOI_CONFIG_MODE=docker
-            - RID_CACHE_DIR=/data/cache
-            - PORT=8002
-        volumes:
-            - cache_data:${RID_CACHE_DIR:-/data/cache}
-            - hackmd_state_data:/app/.koi/cache
         depends_on:
             coordinator:
                 condition: service_healthy
-        restart: unless-stopped
-        networks:
-            - koinet
-        healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8002/health"]
-            interval: 30s
-            timeout: 5s
-            retries: 3
-            start_period: 15s
+        volumes:
+            - hackmd_state_data:/app/.koi/cache
 
     github-processor:
+        <<: *service-defaults
+        environment:
+            PORT: 8011
         build:
             context: ./koi-net-github-processor-node
             args:
-                - PORT=8011
-                - MODULE_NAME=github_processor_node
+                MODULE_NAME: github_processor_node
+                PORT: 8011
         ports:
             - "8011:8011"
-        env_file:
-            - ./global.env
-        environment:
-            - RUN_CONTEXT=docker
-            - KOI_CONFIG_MODE=docker
-            - RID_CACHE_DIR=/data/cache
-            - PORT=8011
-        volumes:
-            - cache_data:${RID_CACHE_DIR:-/data/cache}
-            - github_processor_state:/app/.koi/github-processor/cache
-            - github_index_db_data:/app/.koi/index_db
         depends_on:
             coordinator:
                 condition: service_healthy
             github-sensor:
                 condition: service_healthy
-        restart: unless-stopped
-        networks:
-            - koinet
-        healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8011/health"]
-            interval: 30s
-            timeout: 5s
-            retries: 3
-            start_period: 15s
+        volumes:
+            - github_processor_state:/app/.koi/github-processor/cache
+            - github_index_db_data:/app/.koi/index_db
 
     hackmd-processor:
+        <<: *service-defaults
+        environment:
+            PORT: 8012
         build:
             context: ./koi-net-hackmd-processor-node
             args:
-                - PORT=8012
-                - MODULE_NAME=hackmd_processor_node
+                MODULE_NAME: hackmd_processor_node
+                PORT: 8012
         ports:
             - "8012:8012"
-        env_file:
-            - ./global.env
-        environment:
-            - RUN_CONTEXT=docker
-            - KOI_CONFIG_MODE=docker
-            - RID_CACHE_DIR=/data/cache
-            - PORT=8012
-        volumes:
-            - cache_data:${RID_CACHE_DIR:-/data/cache}
-            - hackmd_processor_state:/app/.koi/hackmd-processor
-            - hackmd_index_db_data:/app/.koi/index_db
         depends_on:
             coordinator:
                 condition: service_healthy
             hackmd-sensor:
                 condition: service_healthy
-        restart: unless-stopped
-        networks:
-            - koinet
-        healthcheck:
-            test: ["CMD", "curl", "--fail", "http://localhost:8012/health"]
-            interval: 30s
-            timeout: 5s
-            retries: 3
-            start_period: 15s
+        volumes:
+            - hackmd_processor_state:/app/.koi/hackmd-processor
+            - hackmd_index_db_data:/app/.koi/index_db
 
 volumes:
     cache_data:
