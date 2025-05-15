@@ -354,12 +354,6 @@ docker-demo: check-env kill-ports install
 	docker compose up -d
 	@echo "All services are now running with the following ports:"
 	@$(MAKE) show-ports
-	@echo "\n========== WAITING FOR SERVICES TO BE HEALTHY =========="
-	@$(MAKE) wait-for-service SERVICE=coordinator
-	@$(MAKE) wait-for-service SERVICE=github-sensor
-	@$(MAKE) wait-for-service SERVICE=hackmd-sensor
-	@$(MAKE) wait-for-service SERVICE=github-processor
-	@$(MAKE) wait-for-service SERVICE=hackmd-processor
 	@echo "\n========== ALL SERVICES ARE HEALTHY =========="
 	@echo "\n========== SYSTEM STATUS REPORTS =========="
 	@echo "\n=== GitHub Repository Status ==="
