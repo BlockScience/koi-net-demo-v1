@@ -345,7 +345,7 @@ check-env:
 docker-demo: check-env clean-docker-containers install
 	@echo "========== STARTING KOI-NET DOCKER WORKFLOW =========="
 	@echo "Step 1: Generate Docker configurations..."
-	@$(MAKE) demo-orchestrator --docker-config-only
+	@$(MAKE) demo-orchestrator
 	@echo "Step 2: Building all services..."
 	COMPOSE_BAKE=true docker compose build --parallel
 	@echo "Step 3: Validating environment variables..."
