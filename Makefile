@@ -342,12 +342,12 @@ check-env:
 		false; \
 	fi
 
-docker-demo: check-env kill-ports install
+docker-demo: check-env clean-docker-containers install
 	@echo "========== STARTING KOI-NET DOCKER WORKFLOW =========="
 	@echo "Step 1: Generate Docker configurations..."
-	@$(MAKE) demo-orchestrator
+	@$(MAKE) demo-orchestrator --docker-config-only
 	@echo "Step 2: Building all services..."
-	docker compose build
+	COMPOSE_BAKE=true docker compose build --parallel
 	@echo "Step 3: Validating environment variables..."
 	@$(MAKE) check-env || true
 	@echo "Step 4: Starting all services..."

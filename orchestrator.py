@@ -6,7 +6,7 @@ This script sets up and configures a KOI-net system with multiple nodes.
 It clones repositories, creates config files, and installs dependencies.
 
 Usage:
-    python orchestrator.py [--docker]
+    python orchestrator.py [--docker] [--docker-config-only]
 
 Configuration Files Generated:
     - config.yaml: Created in each repository directory (e.g., koi-net-coordinator-node/config.yaml)
@@ -290,6 +290,7 @@ def write_dockerfile(repo_dir, module_name, port):
         module_name: The Python module name to import
         port: The port number to use for this container
     """
+    import re
     template_path = Path(__file__).parent / "templates" / "Dockerfile.template"
     if not template_path.exists():
         console.print(f"[bold red]Dockerfile template not found at {template_path}[/bold red]")
@@ -299,13 +300,74 @@ def write_dockerfile(repo_dir, module_name, port):
     with open(template_path, "r") as f:
         template_content = f.read()
 
-    # Replace placeholders in template
-    # The template may use ${MODULE_NAME} or $MODULE_NAME format
-    dockerfile_content = template_content.replace("${MODULE_NAME}", module_name).replace("$MODULE_NAME", module_name)
+    console.print(f"[cyan]Generating Dockerfile for module '{module_name}' on port {port}[/cyan]")
 
-    # Replace the default port with the specified port
-    dockerfile_content = dockerfile_content.replace("ARG PORT=8080", f"ARG PORT={port}")
-
+    # Create a comprehensive variable mapping
+    replacements = {
+        # Module name replacements
+        "${MODULE_NAME}": module_name,
+        "$MODULE_NAME": module_name,
+        "ENV MODULE_NAME=${MODULE_NAME}": f"ENV MODULE_NAME={module_name}",
+        "ENV MODULE_NAME=coordinator_node": f"ENV MODULE_NAME={module_name}",
+        
+        # Port replacements
+        "${PORT}": str(port),
+        "$PORT": str(port),
+        "ARG PORT=8080": f"ARG PORT={port}",
+        "ENV PORT=${PORT}": f"ENV PORT={port}",
+        
+        # EXPOSE with variable
+        "EXPOSE ${PORT}": f"EXPOSE {port}",
+        
+        # HEALTHCHECK with variables
+        'HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \\\n  CMD curl --fail http://0.0.0.0:${PORT}/health': 
+            f'HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \\\n  CMD curl --fail http://0.0.0.0:{port}/health',
+        
+        'HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \\\n    CMD /bin/sh -c "curl --fail http://localhost:${PORT}/health || exit 1"':
+            f'HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \\\n    CMD /bin/sh -c "curl --fail http://localhost:{port}/health || exit 1"',
+        
+        # CMD replacements for both array and string formats
+        'CMD ["uvicorn", "--host", "0.0.0.0", "--port", "${PORT}", "${MODULE_NAME}.server:app"]':
+            f'CMD ["uvicorn", "--host", "0.0.0.0", "--port", "{port}", "{module_name}.server:app"]',
+        
+        'CMD uvicorn ${MODULE_NAME}.server:app --host 0.0.0.0 --port ${PORT}':
+            f'CMD uvicorn {module_name}.server:app --host 0.0.0.0 --port {port}'
+    }
+    
+    # Apply all replacements
+    dockerfile_content = template_content
+    for old, new in replacements.items():
+        if old in dockerfile_content:
+            console.print(f"[dim cyan]Replacing '{old}' with '{new}'[/dim cyan]")
+            dockerfile_content = dockerfile_content.replace(old, new)
+    
+    # Find and log any remaining template variables
+    remaining_vars = re.findall(r'\${[A-Za-z0-9_]+}', dockerfile_content)
+    if remaining_vars:
+        unique_vars = set(remaining_vars)
+        console.print(f"[bold yellow]Found additional variables to replace: {', '.join(unique_vars)}[/bold yellow]")
+        
+        # Do a final scan for any remaining variables
+        for var in unique_vars:
+            var_name = var[2:-1]  # Remove ${ and }
+            if var_name == "MODULE_NAME":
+                replacement = module_name
+            elif var_name == "PORT":
+                replacement = str(port)
+            else:
+                replacement = ""
+                console.print(f"[yellow]Unknown variable {var}, replacing with empty string[/yellow]")
+            
+            dockerfile_content = dockerfile_content.replace(var, replacement)
+    
+    # Check for any quoted command with variables that might not have been replaced
+    cmd_with_vars = re.findall(r'CMD \[".*\$\{.*\}.*"\]', dockerfile_content)
+    if cmd_with_vars:
+        console.print(f"[bold yellow]Found CMD statements with variables: {cmd_with_vars}[/bold yellow]")
+        for cmd in cmd_with_vars:
+            fixed_cmd = cmd.replace(f"${{MODULE_NAME}}", module_name).replace(f"${{PORT}}", str(port))
+            dockerfile_content = dockerfile_content.replace(cmd, fixed_cmd)
+    
     dockerfile_path = Path(repo_dir) / "Dockerfile"
 
     # Remove existing Dockerfile if it exists
@@ -316,7 +378,17 @@ def write_dockerfile(repo_dir, module_name, port):
     with open(dockerfile_path, "w") as f:
         f.write(dockerfile_content)
 
-    console.print(f"[bold green]Generated Dockerfile at {dockerfile_path} with PORT={port}[/bold green]")
+    # Final verification
+    if "${" in dockerfile_content or "$MODULE_NAME" in dockerfile_content or "$PORT" in dockerfile_content:
+        console.print(f"[bold red]Warning: Some variables may not have been replaced in the Dockerfile[/bold red]")
+        # Find and report the problematic lines
+        for line_num, line in enumerate(dockerfile_content.splitlines(), 1):
+            if "${" in line or "$MODULE_NAME" in line or "$PORT" in line:
+                console.print(f"[red]Line {line_num}: {line}[/red]")
+    else:
+        console.print(f"[bold green]All variables successfully replaced in the Dockerfile[/bold green]")
+    
+    console.print(f"[bold green]Generated Dockerfile at {dockerfile_path} with PORT={port} and MODULE_NAME={module_name}[/bold green]")
     return dockerfile_path
 
 def _get_exec_path(venv_base_dir: Path, executable_name: str) -> Path | None:
@@ -482,9 +554,12 @@ def copy_docker_compose_template():
     Returns:
         bool: True if environment variables are properly set up, False otherwise
     """
+    import re
+    import os
     templates_dir = Path(__file__).parent / "templates"
     docker_compose_template = templates_dir / "docker-compose.template.yml"
     docker_compose_dest = Path(__file__).parent / "docker-compose.yml"
+    global_env_path = Path(__file__).parent / "global.env"
 
     # Remove existing docker-compose.yml if it exists
     if docker_compose_dest.exists():
@@ -496,28 +571,106 @@ def copy_docker_compose_template():
         console.print(f"[bold red]ERROR: docker-compose template not found at {docker_compose_template}[/bold red]")
         console.print("[bold yellow]This file should be part of the repository in the templates directory.[/bold yellow]")
         return False
+    
+    # Create the cache directory if it doesn't exist
+    cache_dir = Path(__file__).parent / "data" / "cache"
+    if not cache_dir.exists():
+        os.makedirs(cache_dir, exist_ok=True)
+        console.print(f"[bold green]Created cache directory at {cache_dir}[/bold green]")
 
     # Create a modified copy of the docker-compose template with the correct ports
     with open(docker_compose_template, 'r') as src_file:
         template_content = src_file.read()
 
-    # Replace port placeholders with actual values from SERVICE_PORTS
+    # Get environment variables from global.env if it exists
+    env_vars = {
+        "PORT": "8080",  # Default port
+        "RID_CACHE_DIR": "/data/cache",  # Default cache directory
+    }
+
+    # If global.env doesn't exist, create it with default values
+    if not global_env_path.exists():
+        console.print(f"[bold yellow]Warning: global.env not found at {global_env_path}, creating with default values[/bold yellow]")
+        with open(global_env_path, 'w') as f:
+            f.write(f"PORT={env_vars['PORT']}\n")
+            f.write(f"RID_CACHE_DIR={env_vars['RID_CACHE_DIR']}\n")
+            f.write("RUN_CONTEXT=docker\n")
+            f.write("KOI_CONFIG_MODE=docker\n")
+    else:
+        console.print(f"[bold cyan]Reading environment variables from {global_env_path}[/bold cyan]")
+        with open(global_env_path, 'r') as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)
+                    env_vars[key] = value
+                    console.print(f"[cyan]Found environment variable: {key}[/cyan]")
+
+    # Create mappings for variables in ${VAR} format
+    env_replacements = {}
+    for key, value in env_vars.items():
+        env_replacements[f"${{{key}}}"] = value
+
+    # Add service-specific port replacements from SERVICE_PORTS
     for repo, port in SERVICE_PORTS.items():
         # Replace ports in all relevant places
         template_content = template_content.replace(f"PORT={port}", f"PORT={port}")
         template_content = template_content.replace(f"\"{port}:{port}\"", f"\"{port}:{port}\"")
         template_content = template_content.replace(f"localhost:{port}", f"localhost:{port}")
+    
+    # Apply all environment variable replacements
+    for var_pattern, var_value in env_replacements.items():
+        if var_pattern in template_content:
+            console.print(f"[cyan]Replacing {var_pattern} with {var_value}[/cyan]")
+            template_content = template_content.replace(var_pattern, var_value)
+    
+    # Handle common Docker Compose volume paths specifically
+    # Replace volumes with actual values to avoid Docker Compose warnings
+    template_content = template_content.replace("- cache_data:${RID_CACHE_DIR}", f"- cache_data:{env_vars['RID_CACHE_DIR']}")
+    
+    # Check for any remaining environment variables
+    remaining_vars = re.findall(r'\${[A-Za-z0-9_]+}', template_content)
+    if remaining_vars:
+        unique_vars = set(remaining_vars)
+        console.print(f"[bold yellow]Warning: Found {len(unique_vars)} unreplaced environment variables: {', '.join(unique_vars)}[/bold yellow]")
+        console.print("[bold yellow]These will be replaced with actual values to prevent Docker Compose warnings.[/bold yellow]")
+        
+        # Replace remaining variables with appropriate values or empty strings
+        for var in unique_vars:
+            var_name = var[2:-1]  # Remove ${ and }
+            if var_name in env_vars:
+                template_content = template_content.replace(var, env_vars[var_name])
+                console.print(f"[cyan]Replaced {var} with {env_vars[var_name]}[/cyan]")
+            else:
+                template_content = template_content.replace(var, "")
+                console.print(f"[yellow]Unknown variable {var}, replacing with empty string[/yellow]")
+    
+    # Remove the version attribute if present (it's obsolete in recent Docker Compose)
+    if re.search(r'version:\s*[\'"]?\d+(\.\d+)?[\'"]?', template_content):
+        console.print("[cyan]Removing obsolete 'version' attribute from docker-compose.yml[/cyan]")
+        template_content = re.sub(r'version:\s*[\'"]?\d+(\.\d+)?[\'"]?', '', template_content)
 
     # Write the modified template to the destination
     with open(docker_compose_dest, 'w') as dest_file:
         dest_file.write(template_content)
 
-    console.print(f"[bold green]Copied docker-compose.yml to {docker_compose_dest} with ports from SERVICE_PORTS[/bold green]")
-    console.print(f"[bold green]Volume mounts in docker-compose.yml are configured based on cache_directory_path in node configs[/bold green]")
+    # Final verification - check if any ${variables} remain
+    with open(docker_compose_dest, 'r') as check_file:
+        final_content = check_file.read()
+        remaining = re.findall(r'\${[A-Za-z0-9_]+}', final_content)
+        if remaining:
+            console.print(f"[bold red]Warning: {len(remaining)} environment variables still remain in docker-compose.yml[/bold red]")
+            console.print(f"[red]Remaining variables: {', '.join(set(remaining))}[/red]")
+        else:
+            console.print(f"[bold green]Verified: All variables successfully replaced in docker-compose.yml[/bold green]")
+
+    console.print(f"[bold green]Created docker-compose.yml at {docker_compose_dest} with substituted environment variables[/bold green]")
+    console.print(f"[bold green]Port assignments in docker-compose.yml match the SERVICE_PORTS configuration[/bold green]")
+    console.print(f"[bold green]Docker Compose is ready to use with 'docker-compose up' command[/bold green]")
 
     return True
 
-def main(is_docker=False, branch="demo-1"):
+def main(is_docker=False, branch="demo-1", docker_config_only=False):
     """
     Main function to orchestrate KOI-net system setup
 
@@ -526,12 +679,14 @@ def main(is_docker=False, branch="demo-1"):
     2. Removes any existing configuration files
     3. Generates config.yaml files in each repository
     4. Creates Docker configuration files if in Docker mode
-    5. Sets up virtual environments and installs dependencies
+    5. Sets up virtual environments and installs dependencies (unless docker_config_only=True)
 
     Args:
         is_docker (bool): Whether to run in Docker mode, which changes URLs for container networking
                           and generates Docker configuration files
         branch (str): Git branch to checkout for each repository (default: demo-1)
+        docker_config_only (bool): Whether to only generate Docker configuration files
+                                   without installing dependencies (default: False)
 
     Configuration files created:
     - Each repo/config.yaml: Node configuration files
@@ -632,10 +787,8 @@ HACKMD_API_TOKEN""" + (f"={existing_values.get('HACKMD_API_TOKEN', '')}" if 'HAC
 
         # Update the base_url in node_profile for Docker mode
         if is_docker:
-            # For Docker, use the service name as host instead of 127.0.0.1
             # Convert the repo name to service name following docker-compose convention
             # koi-net-coordinator-node -> coordinator
-            # koi-net-github-sensor-node -> github-sensor
             service_name = repo.replace("koi-net-", "").replace("-node", "")
 
             # Update both the base_url to use service name instead of IP
@@ -652,10 +805,10 @@ HACKMD_API_TOKEN""" + (f"={existing_values.get('HACKMD_API_TOKEN', '')}" if 'HAC
         cache_path = config_dict["koi_net"]["cache_directory_path"]
         first_contact = config_dict["koi_net"].get("first_contact", "")
         config_path = write_full_config(repo_dir, config_dict)
-        if not is_docker:
+        if not is_docker and not docker_config_only:
             install_requirements(repo_dir)
         else:
-            console.print(f"[bold yellow]Skipping dependency installation for {repo_dir} (Docker mode)[/bold yellow]")
+            console.print(f"[bold yellow]Skipping dependency installation for {repo_dir} ({('Docker Config Only' if docker_config_only else 'Docker')} mode)[/bold yellow]")
 
         # Create or update .env file for the repository
         create_env_files(repo_dir, config_dict)
@@ -695,7 +848,6 @@ HACKMD_API_TOKEN""" + (f"={existing_values.get('HACKMD_API_TOKEN', '')}" if 'HAC
     console.print("[bold yellow]source .venv/bin/activate[/bold yellow]\n")
 
     # Clean up existing configuration if in Docker mode
-    # Handle Docker-specific setup
     if is_docker:
         console.print("[bold yellow]Docker mode enabled - will create Docker configuration files[/bold yellow]")
 
@@ -715,7 +867,6 @@ GITHUB_WEBHOOK_SECRET=
             console.print("[bold green]Created global.env.example template[/bold green]")
 
         # Validate that environment variables are set in global.env
-        # This checks the file that should have been created by the logic above the docker block
         try:
             with open(global_env, 'r') as env_file:
                 env_content = env_file.read()
@@ -739,7 +890,6 @@ GITHUB_WEBHOOK_SECRET=
         except FileNotFoundError:
              console.print(f"[bold red]ERROR: global.env file not found for validation at {global_env}.[/bold red]")
              # This case should theoretically be handled by the creation block above,
-             # but adding a check here makes it more robust.
 
         # Check if Dockerfile template exists
         dockerfile_template = templates_dir / "Dockerfile.template"
@@ -764,20 +914,6 @@ GITHUB_WEBHOOK_SECRET=
         console.print("[bold green]- docker-compose.yml has been copied to project root[/bold green]")
         console.print("[bold green]- Ports assigned: 8080 (coordinator), 8001 (GitHub), 8002 (HackMD), 8011/8012 (processors)[/bold green]")
 
-        # # Check if any global.env file exists and has been validated
-        # if global_env.exists():
-        #     with open(global_env, 'r') as env_file:
-        #         env_content = env_file.read()
-        #         if "GITHUB_TOKEN=" in env_content or "HACKMD_API_TOKEN=" in env_content or "GITHUB_WEBHOOK_SECRET=" in env_content:
-        #             console.print("[bold red]⚠️  WARNING: One or more environment variables in global.env are not set![/bold red]")
-        #             console.print("[bold red]The system will not work correctly without proper API tokens.[/bold red]")
-        #             console.print("[bold yellow]- You can now run 'docker-compose up' to start the containers, but you MUST edit global.env first[/bold yellow]\n")
-        #         else:
-        #             console.print("[bold green]- You can now run 'docker-compose up' to start the containers[/bold green]\n")
-        # else:
-        #     console.print("[bold red]⚠️  WARNING: global.env file is missing! The system will not work correctly.[/bold red]")
-        #     console.print("[bold yellow]- Create a global.env file with your API tokens before running docker-compose[/bold yellow]\n")
-
         console.print("[bold yellow]Important Docker run instructions:[/bold yellow]")
         console.print("[bold yellow]1. Edit global.env in the project root to set your API tokens[/bold yellow]")
         console.print("[bold yellow]2. Run 'docker-compose build' to build the containers[/bold yellow]")
@@ -794,8 +930,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='KOI-net orchestrator script')
     parser.add_argument('--docker', dest='is_docker', action='store_true',
                         help='Run in Docker mode - uses fixed ports (8080,8001,8002,8011,8012), changes coordinator URL format for Docker networking, and generates docker-compose.yml, global.env, and Dockerfiles (default: False)')
+    parser.add_argument('--docker-config-only', dest='docker_config_only', action='store_true',
+                        help='Only generate Docker configuration files without installing dependencies. Implies --docker (default: False)')
     parser.add_argument('--branch', dest='branch', default='demo-1',
                         help='Git branch to checkout for each repository (default: demo-1)')
     args = parser.parse_args()
-
-    main(is_docker=args.is_docker, branch=args.branch)
+    
+    # If docker-config-only is specified, also set is_docker to True
+    if args.docker_config_only:
+        args.is_docker = True
+    
+    main(is_docker=args.is_docker, branch=args.branch, docker_config_only=args.docker_config_only)
