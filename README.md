@@ -84,7 +84,7 @@ Each node operates independently with its own configuration, database, and API.
 ## Prerequisites
 
 - Python 3.12+
-- Docker and Docker Compose v2+ (for Docker deployment)
+- Docker and Docker Compose v2.1+ (for Docker deployment)
 - Git
 - Make (optional, see Implementation Details for alternatives)
 
