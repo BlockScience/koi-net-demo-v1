@@ -354,7 +354,6 @@ docker-demo: check-env kill-ports install
 	docker compose up -d
 	@echo "All services are now running with the following ports:"
 	@$(MAKE) show-ports
-	@echo "\n========== ALL SERVICES ARE HEALTHY =========="
 	@echo "\n========== SYSTEM STATUS REPORTS =========="
 	@echo "\n=== GitHub Repository Status ==="
 	-@docker compose exec github-processor python3 -m cli list-repos 2>/dev/null || echo "GitHub processor not initialized yet"
