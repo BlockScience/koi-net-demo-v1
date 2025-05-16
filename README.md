@@ -155,8 +155,8 @@ python cli.py github-processor
 python cli.py hackmd-processor
 
 # Run CLI tools
-python cli.py hackmd-cli
-python cli.py github-cli
+python cli.py hackmd-processor-cli
+python cli.py github-processor-cli
 
 # Show available commands
 python cli.py --help
